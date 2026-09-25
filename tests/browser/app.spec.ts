@@ -2,11 +2,11 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
 const names = ['do', 're', 'mi', 'fa', 'sol', 'la', 'si'];
-const shots = 'artifacts/screenshots';
+const shots = 'artifacts/screenshots/v0.1.2';
 mkdirSync(shots, { recursive: true });
 async function shot(page: Page, name: string) { await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true }); }
 async function setup(page: Page, mode: '练习' | '考试', count: 7 | 21 | 35 = 7, key = 'C') {
-  await page.goto('/');
+  await page.goto('/'); await page.getByRole('button', { name: /^简谱识读/ }).click();
   await page.getByRole('button', { name: new RegExp(`^${mode}模式`) }).click();
   await page.getByLabel('调性', { exact: true }).selectOption(key);
   await page.getByRole('radio', { name: `${count} 题`, exact: true }).check();
@@ -48,7 +48,7 @@ test('练习：实际音频采样、首次错选、重听、稳定反馈位置�
   await expect(page.locator('.score-section')).toContainText('已答 1 / 7 · 正确 0 · 错误 1');
   await expect(page.locator('.report-facts')).toContainText('1 次');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('jianpu-solfege-trainer')!));
-  expect(stored.schemaVersion).toBe(2); expect(stored.sessions).toHaveLength(1);
+  expect(stored.schemaVersion).toBe(3); expect(stored.sessions).toHaveLength(1);
   expect(stored.sessions[0].answers[0].selected).toBe(names[Number(oldQuestion) % 7]);
 });
 test('考试：中性提交、35 题样本报告、主动选择强化和来源隔离', async ({ page }) => {
@@ -125,6 +125,8 @@ test('纯键盘完整流程、数字键无捷径、焦点公平、Escape 取消�
   await page.keyboard.press('Tab'); await expect(page.getByRole('button', { name: '简谱唱名', exact: true })).toBeFocused();
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: '简谱识读', exact: true })).toBeVisible();
+  await page.keyboard.press('Tab'); await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: '练习模式', exact: true })).toBeVisible();
   await page.keyboard.press('Tab'); await expect(page.locator('#key')).toBeFocused();
   await page.keyboard.press('Tab'); await page.keyboard.press('ArrowLeft');
@@ -149,7 +151,7 @@ test('纯键盘完整流程、数字键无捷径、焦点公平、Escape 取消�
 });
 test('采样失败显示实际错误，可重试恢复原题', async ({ page }) => {
   await page.route('**/audio/piano/C4.mp3', route => route.abort('failed'));
-  await page.goto('/'); await page.getByRole('button', { name: /^考试模式/ }).click();
+  await page.goto('/'); await page.getByRole('button', { name: /^简谱识读/ }).click(); await page.getByRole('button', { name: /^考试模式/ }).click();
   await page.getByRole('button', { name: '开始考试', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('未能加载本地钢琴采样');
   expect(await page.locator('.answer').count()).toBe(0);
@@ -161,7 +163,7 @@ test('采样失败显示实际错误，可重试恢复原题', async ({ page }) 
 });
 test('主动静音允许无采样答题，启用声音后加载并保留原题', async ({ page }) => {
   await page.route('**/audio/piano/**', route => route.abort('failed'));
-  await page.goto('/'); await page.getByRole('button', { name: /^练习模式/ }).click();
+  await page.goto('/'); await page.getByRole('button', { name: /^简谱识读/ }).click(); await page.getByRole('button', { name: /^练习模式/ }).click();
   await page.locator('.sound-control summary').click(); await page.getByLabel('静音', { exact: true }).check();
   await page.getByRole('button', { name: '开始练习', exact: true }).click();
   await expect(page.locator('#question')).toBeVisible();
@@ -190,7 +192,7 @@ test('暂停保留已提交考试的中性状态，刷新回首页但保留已�
 test('恢复声音尚在加载时再次切到后台，旧回调不能自动恢复答题', async ({ page }) => {
   const pending: Route[] = [];
   await page.route('**/audio/piano/*.mp3', route => { pending.push(route); });
-  await page.goto('/'); await page.getByRole('button', { name: /^练习模式/ }).click();
+  await page.goto('/'); await page.getByRole('button', { name: /^简谱识读/ }).click(); await page.getByRole('button', { name: /^练习模式/ }).click();
   await page.locator('.sound-control summary').click(); await page.getByLabel('静音', { exact: true }).check();
   await page.getByRole('button', { name: '开始练习', exact: true }).click();
   await expect(page.locator('#question')).toBeVisible();
@@ -263,6 +265,7 @@ test('手机报告、详情、历史及保存失败均可达', async ({ page }) 
   await shot(page, 'history-320x568');
   await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); }; });
   await page.getByRole('button', { name: '简谱唱名', exact: true }).click();
+  await page.getByRole('button', { name: /^简谱识读/ }).click();
   await page.getByRole('button', { name: /^练习模式/ }).click();
   await expect(page.locator('.storage-notice')).toContainText('保存失败');
 });

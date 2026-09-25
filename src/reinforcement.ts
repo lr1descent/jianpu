@@ -39,7 +39,7 @@ export function reinforcementSequence(pairs: readonly ConfusionPair[], random: R
   return result;
 }
 export function sourceSnapshot(exam: SessionRecord, pairs: readonly ConfusionPair[]): ReinforcementSource {
-  if (exam.mode !== 'exam' || !exam.answers || !pairs.length) throw new Error('该记录不能作为强化来源');
+  if (exam.module !== 'notation' || exam.mode !== 'exam' || !exam.answers || !pairs.length) throw new Error('该记录不能作为简谱强化来源');
   return { examId: exam.id, examKey: exam.key, examEndedAt: exam.endedAt,
     examPlannedQuestions: exam.plannedQuestions, examAnswered: exam.summary.answered,
     examCorrect: exam.summary.correct, examEndedEarly: exam.endedEarly,

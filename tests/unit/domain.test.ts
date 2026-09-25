@@ -5,13 +5,13 @@ import { Session } from '../../src/session';
 import { confusionMatrix, confusionPairs } from '../../src/confusion';
 import { reinforcementSequence, sourceSnapshot, targetQuotas } from '../../src/reinforcement';
 import { accuracy, summarize } from '../../src/statistics';
-import { BACKUP_KEY, DEFAULT_SETTINGS, LocalStore, STORAGE_KEY } from '../../src/storage';
+import { BACKUP_KEY, DEFAULT_SETTINGS, DEFAULT_MODULE_SETTINGS, LocalStore, STORAGE_KEY } from '../../src/storage';
 import type { ConfusionPair, Degree, SessionRecord } from '../../src/types';
 
 const seeded = (initial: number) => { let seed = initial; return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; }; };
 const pair = (a: Degree, b: Degree, total = 1): ConfusionPair => ({ a, b, aToB: total, bToA: 0, total });
 function sampleReport() {
-  const session = new Session({ mode: 'exam', key: 'C', count: 35, muted: false }, () => 1000, seeded(9), 'example');
+  const session = new Session({ module: 'notation', mode: 'exam', key: 'C', count: 35, muted: false }, () => 1000, seeded(9), 'example');
   const wrongs = new Map([[3, 2], [5, 1]]);
   for (let i = 0; i < 35; i++) {
     session.ready();
@@ -59,7 +59,7 @@ describe('首调音乐规则与洗牌袋', () => {
 describe('首次答案、暂停与计时', () => {
   it('连点只记录一次，考试保持中性阶段，重听前后计数不改耗时', () => {
     let time = 0;
-    const s = new Session({ mode: 'exam', key: 'D', count: 7, muted: false }, () => time);
+    const s = new Session({ module: 'notation', mode: 'exam', key: 'D', count: 7, muted: false }, () => time);
     expect(s.submit('fa', false)).toBe(false);
     time = 500; s.ready(); time = 800; s.replay(); time = 1300;
     const question = structuredClone(s.question);
@@ -73,7 +73,7 @@ describe('首次答案、暂停与计时', () => {
     expect(s.index).toBe(1);
   });
   it('中断未答题保留原题、耗时 null；已答题中断保留首次记录且不能重答', () => {
-    const s = new Session({ mode: 'practice', key: 'C', count: 7, muted: false }, () => 250);
+    const s = new Session({ module: 'notation', mode: 'practice', key: 'C', count: 7, muted: false }, () => 250);
     s.ready(); const q = structuredClone(s.question); s.suspend();
     expect(s.submit('do', false)).toBe(false); s.resume();
     expect(s.question).toEqual(q); s.submit(q.correctAnswer, false);
@@ -84,10 +84,10 @@ describe('首次答案、暂停与计时', () => {
     expect(s.submit('fa', true)).toBe(false);
   });
   it('零作答与部分完成按已答计分；结算冻结并去重', () => {
-    const zero = new Session({ mode: 'exam', key: 'C', count: 35, muted: false });
+    const zero = new Session({ module: 'notation', mode: 'exam', key: 'C', count: 35, muted: false });
     expect(zero.finish().summary).toMatchObject({ answered: 0, correct: 0, medianCorrectReactionMs: null });
     expect(accuracy(0, 0)).toBe('—');
-    const s = new Session({ mode: 'exam', key: 'C', count: 35, muted: false });
+    const s = new Session({ module: 'notation', mode: 'exam', key: 'C', count: 35, muted: false });
     s.ready(); s.submit(s.question.correctAnswer, false); s.markMuted();
     const first = s.finish(); expect(first.endedEarly).toBe(true);
     expect(accuracy(first.summary.correct, first.summary.answered)).toBe('100%');
@@ -132,7 +132,7 @@ describe('有方向的混淆及自选强化', () => {
     const exam = sampleReport(); const before = structuredClone(exam);
     const pairs = confusionPairs(exam.answers!); const source = sourceSnapshot(exam, pairs);
     pairs[0].total = 99;
-    const s = new Session({ mode: 'reinforcement', key: exam.key, count: 21, source, muted: false });
+    const s = new Session({ module: 'notation', mode: 'reinforcement', key: exam.key, count: 21, source, muted: false });
     source.selectedPairs[0].total = 100;
     for (let i = 0; i < 21; i++) { s.ready(); s.submit('do', false); s.next(); }
     const result = s.finish(); expect(result.plannedQuestions).toBe(21); expect(result.answers).toHaveLength(21);
@@ -140,7 +140,7 @@ describe('有方向的混淆及自选强化', () => {
     expect(result.id).not.toBe(exam.id); expect(exam).toEqual(before);
   });
 });
-describe('schema v2、迁移与本地数据安全', () => {
+describe('schema v3、迁移与本地数据安全', () => {
   it('保存真实错选，读取还原报告，ID 去重，上限按结束时间保留 100', () => {
     const memory = new MemoryStorage(); const store = new LocalStore(memory); const report = sampleReport();
     store.save(report); store.save(report); expect(store.data.sessions).toHaveLength(1);
@@ -152,7 +152,8 @@ describe('schema v2、迁移与本地数据安全', () => {
     const memory = new MemoryStorage(); const exam = sampleReport();
     const original = JSON.stringify({ schemaVersion: 1, settings: { key: 'D', questionCount: 7, volume: 0.2, muted: true }, sessions: [exam] });
     memory.setItem(STORAGE_KEY, original); const store = new LocalStore(memory);
-    expect(store.data.settings).toMatchObject({ key: 'D', practiceQuestionCount: 7, examQuestionCount: 35, muted: true });
+    expect(store.data.settings.modules.notation).toMatchObject({ key: 'D', practiceQuestionCount: 7, examQuestionCount: 35 });
+    expect(store.data.settings.muted).toBe(true);
     expect(store.data.sessions[0]).toMatchObject({ mode: 'practice', answers: null, legacySummaryOnly: true, summary: exam.summary });
     expect(memory.getItem(BACKUP_KEY)).toBe(original);
   });
@@ -163,7 +164,7 @@ describe('schema v2、迁移与本地数据安全', () => {
   });
   it('备份失败仍保留旧键；写入失败有提示；只清理应用历史', () => {
     const memory = new MemoryStorage(); memory.setItem('unrelated', 'keep');
-    const raw = JSON.stringify({ schemaVersion: 1, settings: { ...DEFAULT_SETTINGS }, sessions: [sampleReport()] });
+    const raw = JSON.stringify({ schemaVersion: 1, settings: { ...DEFAULT_MODULE_SETTINGS, volume: 0.3, muted: false }, sessions: [sampleReport()] });
     memory.setItem(STORAGE_KEY, raw); memory.fail = true; const store = new LocalStore(memory);
     store.save(sampleReport()); expect(memory.getItem(STORAGE_KEY)).toBe(raw); expect(store.notice).toContain('内存');
     const writable = new MemoryStorage(); const live = new LocalStore(writable); writable.fail = true;
@@ -176,14 +177,14 @@ describe('schema v2、迁移与本地数据安全', () => {
     const broken = structuredClone(report); broken.answers![0].correct = !broken.answers![0].correct;
     expect(() => store.save(broken)).toThrow();
     const source = sourceSnapshot(report, confusionPairs(report.answers!));
-    const s = new Session({ mode: 'reinforcement', key: 'C', count: 21, muted: false, source });
+    const s = new Session({ module: 'notation', mode: 'reinforcement', key: 'C', count: 21, muted: false, source });
     const record = s.finish(); store.save(record);
     expect(new LocalStore(memory).data.sessions[0].reinforcementSource).toEqual(source);
   });
   it('已存的派生摘要以首次答案校正，不改变答案', () => {
     const memory = new MemoryStorage(); const report: SessionRecord = sampleReport();
     report.summary = { ...report.summary, correct: 0, wrong: 35 };
-    memory.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 2, settings: DEFAULT_SETTINGS, sessions: [report] }));
+    memory.setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: 3, settings: DEFAULT_SETTINGS, sessions: [report] }));
     expect(new LocalStore(memory).data.sessions[0].summary.correct).toBe(32);
   });
 });

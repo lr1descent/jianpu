@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 if (process.platform !== 'darwin') throw new Error('macOS 打包需要在 Mac 上执行。');
 const project = fileURLToPath(new URL('..', import.meta.url));
+const { version } = JSON.parse(readFileSync(path.join(project, 'package.json'), 'utf8'));
 const build = path.join(project, '.build/macos');
 const output = path.join(project, 'artifacts/macos');
 const bundle = path.join(output, '简谱唱名.app');
@@ -27,8 +28,8 @@ run('iconutil', ['-c', 'icns', path.join(build, 'AppIcon.iconset'), '-o', path.j
 run('plutil', ['-lint', path.join(contents, 'Info.plist')]);
 run('codesign', ['--force', '--sign', '-', '--identifier', 'local.jianpu.solfege', bundle]);
 run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', bundle]);
-const archive = path.join(output, '简谱唱名-macOS-AppleSilicon.zip');
+const archive = path.join(output, `简谱唱名-${version}-macOS-AppleSilicon.zip`);
 rmSync(archive, { force: true });
 run('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', bundle, archive]);
-writeFileSync(path.join(output, '使用说明.txt'), '简谱唱名 1.2.0\n\n适用：Apple Silicon（M 系列）Mac，macOS 13 或更新。\n解压后将“简谱唱名.app”拖到“应用程序”，双击运行。无需 Node.js、终端或外网。\n\n此版本采用本机临时签名，未经过 Apple Developer ID 签名和公证；跨设备分发时，macOS 可能需要你确认应用来源。\n设置和历史独立保存在此应用中，浏览器已有记录不会自动转入，也不会被改动。\n不要更改本机服务端口 41876，否则会改变历史数据的来源标识。\n');
+writeFileSync(path.join(output, '使用说明.txt'), `简谱唱名 ${version}\n\n适用：Apple Silicon（M 系列）Mac，macOS 13 或更新。\n解压后将“简谱唱名.app”拖到“应用程序”，双击运行。无需 Node.js、终端或外网。\n\n此版本采用本机临时签名，未经过 Apple Developer ID 签名和公证；跨设备分发时，macOS 可能需要你确认应用来源。\n设置和历史独立保存在此应用中，浏览器已有记录不会自动转入，也不会被改动。\n不要更改本机服务端口 41876，否则会改变历史数据的来源标识。\n`);
 console.log(`\n应用：${bundle}\n压缩包：${archive}`);

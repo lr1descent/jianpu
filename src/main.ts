@@ -8,11 +8,11 @@ import { LocalStore } from './storage';
 import { DEGREES, KEYS, keyInfo, pitch } from './music';
 import { confusionPairs } from './confusion';
 import { sourceSnapshot } from './reinforcement';
-import { answerClass, escape, feedbackView, header, historyView, homeView, learnView, modeName, muted,
+import { answerClass, escape, feedbackView, header, historyView, homeView, learnView, modeName, moduleView, muted,
   nextLabel, quizView, resultView, reviewView, runningSummary, setupView, volumeLabel } from './views';
-import type { Degree, KeyId, Mode, ReinforcementSource, SessionRecord, Solfege } from './types';
+import type { Degree, ExerciseModule, KeyId, Mode, ModuleSettings, ReinforcementSource, SessionRecord, Solfege } from './types';
 
-type Page = 'home' | 'setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
+type Page = 'home' | 'module' | 'setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
 const app = document.querySelector<HTMLDivElement>('#app')!;
 // Accessing localStorage itself can fail in restricted browsing contexts.
 const storage = new LocalStore({
@@ -22,15 +22,22 @@ const storage = new LocalStore({
 });
 const piano = new Piano();
 let page: Page = 'home';
+let exerciseModule: ExerciseModule = 'notation';
 let setupMode: 'practice' | 'exam' = 'practice';
 let session: Session | undefined;
 let report: SessionRecord | undefined;
 let reinforcement: ReinforcementSource | undefined;
 let selectedPairs = new Set<string>();
 let historyFilter: Mode | 'all' = 'all';
+let historyModule: ExerciseModule | 'all' = 'all';
 let operation = 0;
 let busy = false;
 const settings = () => storage.data.settings;
+const moduleSettings = () => settings().modules[exerciseModule];
+const viewSettings = () => ({ ...settings(), ...moduleSettings() });
+function updateModuleSettings(changes: Partial<ModuleSettings>) {
+  storage.updateSettings({ ...settings(), modules: { ...settings().modules, [exerciseModule]: { ...moduleSettings(), ...changes } } });
+}
 const active = () => page === 'quiz' && session?.phase !== 'result';
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 
@@ -41,8 +48,8 @@ function noticeView() {
 function render(focus = true) {
   document.body.classList.toggle('is-quiz', page === 'quiz');
   const views: Record<Page, () => string> = {
-    home: homeView, setup: () => setupView(setupMode, settings()), quiz: () => quizView(session!),
-    learn: () => learnView(settings()), history: () => historyView(storage.data.sessions, historyFilter),
+    home: homeView, module: () => moduleView(exerciseModule), setup: () => setupView(exerciseModule, setupMode, viewSettings()), quiz: () => quizView(session!),
+    learn: () => learnView(viewSettings()), history: () => historyView(storage.data.sessions, historyFilter, historyModule),
     review: () => reviewView(reinforcement!, settings()),
     result: () => resultView(report!, selectedPairs, storage.data.sessions.some(s => s.id === report?.reinforcementSource?.examId)),
   };
@@ -94,10 +101,26 @@ function updateMutedNote() {
   const note = document.querySelector('#muted-note');
   if (note) note.textContent = muted(settings()) ? ' 当前已静音，本轮会记录静音状态。' : '';
 }
-function playQuestion() {
-  if (!active() || !session || !['answering', 'practiceFeedback', 'examAnswerRecorded'].includes(session.phase)) return;
-  try { piano.play(session.question.midi); }
-  catch (error) { interrupt(message(error)); }
+async function playQuestion() {
+  if (!active() || !session) return;
+  const current = session, token = operation;
+  try {
+    if (current.config.module === 'relative') {
+      if (muted(settings())) throw new Error('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
+      if (!current.beginPlayback()) return;
+      render();
+      const played = await piano.playPair(keyInfo(current.config.key).tonicMidi, current.question.midi);
+      if (played && token === operation && current === session && current.completePlayback()) render();
+    } else if (['answering', 'practiceFeedback', 'examAnswerRecorded'].includes(current.phase)) {
+      await piano.play(current.question.midi);
+    }
+  } catch (error) { if (token === operation) interrupt(message(error)); }
+}
+async function presentQuestion() {
+  if (!session) return;
+  if (session.config.module === 'notation') session.ready();
+  render();
+  await playQuestion();
 }
 async function start(config: SessionConfig) {
   if (busy || active()) return;
@@ -110,14 +133,15 @@ async function start(config: SessionConfig) {
   render();
   window.scrollTo(0, 0);
   try {
+    if (config.module === 'relative' && muted(settings())) throw new Error('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
     if (!muted(settings())) await piano.initialize();
     if (token !== operation || !session) return;
-    if (session.ready()) { render(); playQuestion(); }
+    await presentQuestion();
   } catch (error) { if (token === operation) interrupt(message(error)); }
   finally { if (token === operation) busy = false; }
 }
-function startMain(mode = setupMode, key = settings().key, count = mode === 'exam' ? settings().examQuestionCount : settings().practiceQuestionCount) {
-  void start({ mode, key, count, muted: muted(settings()) });
+function startMain(mode = setupMode, key = moduleSettings().key, count = mode === 'exam' ? moduleSettings().examQuestionCount : moduleSettings().practiceQuestionCount, module = exerciseModule) {
+  void start({ module, mode, key, count, muted: muted(settings()) });
 }
 function answer(selected: Solfege) {
   if (!active() || !session?.submit(selected, muted(settings()))) return;
@@ -141,7 +165,7 @@ function next() {
   if (!session || !active() || !['practiceFeedback', 'examAnswerRecorded'].includes(session.phase)) return;
   piano.stop();
   if (session.index === session.questions.length - 1) { finish(); return; }
-  if (session.next()) { session.ready(); render(); playQuestion(); }
+  if (session.next()) void presentQuestion();
 }
 function finish() {
   if (!session || !active()) return;
@@ -165,10 +189,14 @@ function interrupt(reason?: string) {
 function pauseDialog() {
   if (!session) return;
   const failed = session.phase === 'audioError';
+  const requiresSound = session.config.module === 'relative';
   showDialog(failed ? '声音需要恢复' : `${modeName(session.config.mode)}已暂停`,
     failed ? session.error : '本题和已提交的答案已保留。点击继续后恢复声音；中断前未作答的题目不计入速度统计。',
-    [{ label: failed ? '重试 / 启用声音' : '继续', primary: true, run: () => { void resume(); } },
-      ...(failed ? [{ label: '静音继续', run: () => { storage.updateSettings({ ...settings(), muted: true }); setPianoVolume(); session!.markMuted(); void resume(); } }] : []),
+    [{ label: requiresSound && muted(settings()) ? (settings().volume === 0 ? '启用声音（30%）并继续' : '取消静音并继续') : failed ? '重试 / 启用声音' : '继续', primary: true, run: () => {
+      if (requiresSound && muted(settings())) { storage.updateSettings({ ...settings(), muted: false, volume: settings().volume || 0.3 }); setPianoVolume(); }
+      void resume();
+    } },
+      ...(failed && !requiresSound ? [{ label: '静音继续', run: () => { storage.updateSettings({ ...settings(), muted: true }); setPianoVolume(); session!.markMuted(); void resume(); } }] : []),
       { label: session.config.mode === 'exam' ? '提前交卷' : '结束本轮', run: () => confirmEnd() }]);
 }
 async function resume(returnFocus?: HTMLElement) {
@@ -185,7 +213,7 @@ async function resume(returnFocus?: HTMLElement) {
     if (session.visiblePhase === 'answering' && !document.querySelector('#question')) render();
     if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); else focusPage();
     soundUpdated();
-    if (unanswered) playQuestion();
+    if (unanswered) await playQuestion();
   } catch (error) { if (token === operation) interrupt(message(error)); }
   finally { if (token === operation) busy = false; }
 }
@@ -205,7 +233,7 @@ function confirmEnd() {
 async function preview(degree: Degree, trigger: HTMLButtonElement) {
   if (busy || !DEGREES.includes(degree) || !['learn', 'review'].includes(page)) return;
   const token = ++operation;
-  const key = page === 'review' ? reinforcement!.examKey : settings().key;
+  const key = page === 'review' ? reinforcement!.examKey : moduleSettings().key;
   busy = true;
   const status = document.querySelector('#preview-status')!;
   status.textContent = '正在准备钢琴音色…';
@@ -213,14 +241,15 @@ async function preview(degree: Degree, trigger: HTMLButtonElement) {
   try {
     if (!muted(settings())) await piano.initialize();
     if (token !== operation) return;
-    piano.play(pitch(key, degree).midi);
+    const played = piano.play(pitch(key, degree).midi);
     status.textContent = muted(settings()) ? '当前已静音。可在声音设置中开启。' : `正在试听 ${degree} — ${trigger.querySelector('.note-mapping span')!.textContent}`;
+    await played;
   } catch (error) {
     if (token === operation) status.textContent = `${message(error)} 点击音符可重试。`;
   } finally { if (token === operation) busy = false; }
 }
 function chooseReinforcement() {
-  if (!report?.answers || report.mode !== 'exam' || !selectedPairs.size) return;
+  if (!report?.answers || report.module !== 'notation' || report.mode !== 'exam' || !selectedPairs.size) return;
   const pairs = confusionPairs(report.answers).filter(p => selectedPairs.has(`${p.a}-${p.b}`));
   reinforcement = sourceSnapshot(report, pairs);
   navigate('review');
@@ -237,28 +266,32 @@ app.addEventListener('click', event => {
   if (active() && !['answer', 'next', 'replay', 'end', 'retry-save'].includes(action!)) return;
   switch (action) {
     case 'home': navigate('home'); break;
+    case 'module':
+      if (target.dataset.module === 'notation' || target.dataset.module === 'relative') exerciseModule = target.dataset.module;
+      navigate('module'); break;
     case 'learn': navigate('learn'); break;
     case 'history': navigate('history'); break;
     case 'setup-practice': case 'setup-exam':
       setupMode = action === 'setup-practice' ? 'practice' : 'exam';
-      storage.updateSettings({ ...settings(), lastMainMode: setupMode });
+      updateModuleSettings({ lastMainMode: setupMode });
       navigate('setup'); break;
     case 'start': startMain(); break;
     case 'answer': answer(target.dataset.answer as Solfege); break;
     case 'next': next(); break;
-    case 'replay': if (session?.replay()) playQuestion(); break;
+    case 'replay': if (session?.replay()) void playQuestion(); break;
     case 'end': confirmEnd(); break;
     case 'preview': void preview(Number(target.dataset.degree) as Degree, target); break;
     case 'open-report': { const found = storage.data.sessions.find(s => s.id === target.dataset.id); if (found) openReport(found); break; }
     case 'filter': historyFilter = target.dataset.filter as Mode | 'all'; render(false); app.querySelector<HTMLButtonElement>(`[data-filter="${historyFilter}"]`)?.focus(); break;
+    case 'filter-module': historyModule = target.dataset.module as ExerciseModule | 'all'; historyFilter = 'all'; render(false); app.querySelector<HTMLButtonElement>(`[data-action="filter-module"][data-module="${historyModule}"]`)?.focus(); break;
     case 'clear-history': showDialog('清空历史记录？', '将删除本应用保存的所有练习、考试与强化记录。声音和练习设置会保留。',
       [{ label: '取消', run: () => {} }, { label: '确认清空', run: () => { storage.clearHistory(); render(); } }], () => {}); break;
     case 'reinforce': chooseReinforcement(); break;
-    case 'start-reinforcement': if (reinforcement) void start({ mode: 'reinforcement', key: reinforcement.examKey, count: 21, muted: muted(settings()), source: reinforcement }); break;
+    case 'start-reinforcement': if (reinforcement) void start({ module: 'notation', mode: 'reinforcement', key: reinforcement.examKey, count: 21, muted: muted(settings()), source: reinforcement }); break;
     case 'source-report': sourceReport(); break;
-    case 'again': if (report && report.mode !== 'reinforcement') startMain(report.mode, report.key, report.plannedQuestions); break;
+    case 'again': if (report && report.mode !== 'reinforcement') startMain(report.mode, report.key, report.plannedQuestions, report.module); break;
     case 'again-reinforcement': reinforcement = structuredClone(report!.reinforcementSource!); navigate('review'); break;
-    case 'retest-source': { const source = report!.reinforcementSource!; startMain('exam', source.examKey, source.examPlannedQuestions); break; }
+    case 'retest-source': { const source = report!.reinforcementSource!; startMain('exam', source.examKey, source.examPlannedQuestions, 'notation'); break; }
     case 'retry-save': storage.retry(); render(false); break;
   }
 });
@@ -281,6 +314,10 @@ function soundUpdated() {
   if (mute) mute.checked = settings().muted;
   updateMutedNote();
   if (!active() || !session) return;
+  if (session.config.module === 'relative' && muted(settings())) {
+    interrupt('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
+    return;
+  }
   if (muted(settings()) && session.phase === 'loading') {
     operation++;
     busy = false;
@@ -295,17 +332,17 @@ app.addEventListener('change', event => {
   const target = event.target as HTMLInputElement;
   if (target.id === 'mute') { storage.updateSettings({ ...settings(), muted: target.checked }); soundUpdated(); }
   if (target.id === 'key' && !active() && KEYS.some(k => k.id === target.value)) {
-    storage.updateSettings({ ...settings(), key: target.value as KeyId });
+    updateModuleSettings({ key: target.value as KeyId });
     piano.stop();
     operation++;
     busy = false;
     if (page === 'learn') { render(false); app.querySelector<HTMLSelectElement>('#key')?.focus(); }
-    else document.querySelector('#starting-note')!.textContent = `本轮起始音：${keyInfo(settings().key).notes[0]}`;
+    else document.querySelector('#starting-note')!.textContent = `${exerciseModule === 'relative' ? '每题参考 do' : '本轮起始音'}：${keyInfo(moduleSettings().key).notes[0]}`;
   }
   if (target.name === 'count' && page === 'setup') {
     const count = Number(target.value);
     if (count !== 7 && count !== 21 && count !== 35) return;
-    storage.updateSettings({ ...settings(), [setupMode === 'practice' ? 'practiceQuestionCount' : 'examQuestionCount']: count });
+    updateModuleSettings({ [setupMode === 'practice' ? 'practiceQuestionCount' : 'examQuestionCount']: count });
     document.querySelector<HTMLElement>('#small-sample')!.hidden = setupMode !== 'exam' || count !== 7;
   }
   if (target.name === 'pair' && page === 'result') {

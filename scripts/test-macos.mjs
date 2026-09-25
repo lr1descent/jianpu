@@ -7,6 +7,7 @@ import path from 'node:path';
 
 if (process.platform !== 'darwin') throw new Error('Mac 应用检查需要在 macOS 上执行。');
 const project = fileURLToPath(new URL('..', import.meta.url));
+const { version } = JSON.parse(readFileSync(path.join(project, 'package.json'), 'utf8'));
 const build = path.join(project, '.build/macos');
 const output = path.join(project, 'artifacts/macos');
 const bundleName = '简谱唱名.app';
@@ -21,7 +22,7 @@ console.log(run(binary, process.argv.includes('--network') ? ['--network'] : [])
 
 const temporary = mkdtempSync(path.join(build, 'archive-check-'));
 try {
-  run('ditto', ['-x', '-k', path.join(output, '简谱唱名-macOS-AppleSilicon.zip'), temporary]);
+  run('ditto', ['-x', '-k', path.join(output, `简谱唱名-${version}-macOS-AppleSilicon.zip`), temporary]);
   const unpacked = path.join(temporary, bundleName);
   run('codesign', ['--verify', '--deep', '--strict', unpacked]);
   const contents = path.join(unpacked, 'Contents');
@@ -31,6 +32,7 @@ try {
   const plist = JSON.parse(run('plutil', ['-convert', 'json', '-o', '-', path.join(contents, 'Info.plist')]));
   assert.equal(plist.CFBundleIdentifier, 'local.jianpu.solfege');
   assert.equal(plist.LSMinimumSystemVersion, '13.0');
+  assert.equal(plist.CFBundleShortVersionString, version);
   const resources = path.join(contents, 'Resources');
   assert.ok(statSync(path.join(resources, 'AppIcon.icns')).size > 0);
   assert.ok(existsSync(path.join(resources, 'THIRD_PARTY_NOTICES.md')));

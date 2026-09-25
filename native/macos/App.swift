@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNa
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "简谱唱名", .applicationVersion: "1.2.0",
+            .applicationName: "简谱唱名",
             .credits: NSAttributedString(string: "看数字，听钢琴，选唱名。\n\n钢琴：Salamander Grand Piano\nAlexander Holm · CC BY 3.0\n采样和许可随应用提供。")
         ])
     }

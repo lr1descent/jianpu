@@ -25,6 +25,12 @@
 .quiz-progress::-moz-progress-bar { background: var(--accent); }
 .question-stage { min-height: 13rem; display: grid; place-items: center; padding: var(--space-5) 0 var(--space-3); }
 .question-number { font-size: 8rem; font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; text-align: center; width: 100%; }
+.listening-stage { min-height: 11rem; display: flex; flex-direction: column; justify-content: center; gap: var(--space-4); text-align: center; padding: var(--space-5) 0; }
+.listening-stage h1 { font-size: 1.5rem; line-height: 1.35; }
+.listening-stage p { min-height: 1.5em; }
+.relative-confusions { list-style: none; padding: 0; }
+.relative-confusions li { padding: var(--space-4) 0; border-bottom: 1px solid var(--border-subtle); }
+.relative-confusions p { margin-top: var(--space-2); }
 .replay-row { display: flex; justify-content: center; margin-bottom: var(--space-6); }
 .button.replay { min-width: 5.5rem; font-size: .875rem; background: var(--surface); }
 .answers { display: flex; justify-content: center; gap: var(--space-3); margin: 0 auto; }
