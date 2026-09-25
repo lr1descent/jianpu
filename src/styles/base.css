@@ -1,0 +1,31 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--canvas); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; font-size: 1rem; line-height: 1.6; }
+button, input, select { font: inherit; }
+button, summary, select, input[type="checkbox"], input[type="radio"], input[type="range"] { cursor: pointer; }
+button { color: inherit; }
+button:disabled { cursor: default; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+h1:focus, #feedback:focus { outline: none; }
+/* Programmatically focused headings are not interactive controls. */
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 1.5rem; font-weight: 600; line-height: 1.35; }
+h2 { font-size: 1.375rem; font-weight: 600; line-height: 1.35; }
+h3 { font-size: 1rem; font-weight: 600; margin-top: var(--space-5); }
+p + p { margin-top: var(--space-2); }
+a { color: var(--accent); }
+fieldset { padding: 0; margin: var(--space-6) 0 0; border: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: var(--space-3); font-weight: 500; }
+[hidden] { display: none !important; }
+.secondary-text, .field-hint { color: var(--text-secondary); }
+.field-hint { font-size: .875rem; line-height: 1.5; margin-top: var(--space-3); }
+.page { width: calc(100% - 4rem); max-width: 60rem; margin: 0 auto; padding: var(--space-7) 0 var(--space-8); }
+.narrow { max-width: 35rem; }
+.reading { max-width: 47.5rem; }
+.page-heading { margin: var(--space-5) 0 var(--space-6); }
+.page-heading p { margin-top: var(--space-2); }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-5); }
+.local-note { color: var(--text-secondary); font-size: .875rem; }
+@media (max-width: 600px) { .page { width: calc(100% - 2rem); padding-top: var(--space-5); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }

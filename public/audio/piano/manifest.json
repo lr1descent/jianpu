@@ -1,0 +1,55 @@
+{
+  "author": "Alexander Holm",
+  "instrument": "Salamander Grand Piano",
+  "license": "CC BY 3.0",
+  "files": [
+    {
+      "file": "C4.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/C4.mp3",
+      "bytes": 78718,
+      "sha256": "689eaa4c2fd7f29a2cc0e386eec462156d523a87d701269e5e2458e66056f4f6"
+    },
+    {
+      "file": "Ds4.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/Ds4.mp3",
+      "bytes": 73519,
+      "sha256": "663e8bb3e2d0fa23a30526dcd7ab0e42609c193c07025647ef46badcf81ec211"
+    },
+    {
+      "file": "Fs4.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/Fs4.mp3",
+      "bytes": 68219,
+      "sha256": "613652f5c96e35736ce6a46bc4ddb6ba1076d1fb16a35a4c22c14e67efdde57c"
+    },
+    {
+      "file": "A4.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/A4.mp3",
+      "bytes": 61148,
+      "sha256": "a62df24a2c84cea8d18c1fa8aca7c18c877ba2b76a00a591256fa74d3ce54ac3"
+    },
+    {
+      "file": "C5.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/C5.mp3",
+      "bytes": 68920,
+      "sha256": "2f5b0f7422063010fb379e684bfdf2daa3911dcd2251413d79fa2a53029fdc30"
+    },
+    {
+      "file": "Ds5.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/Ds5.mp3",
+      "bytes": 58179,
+      "sha256": "bf71096e653ab7ceca3914b9fd44d8c27fe83c162564c5db34bd06b94eb14b8c"
+    },
+    {
+      "file": "Fs5.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/Fs5.mp3",
+      "bytes": 51597,
+      "sha256": "ed2fdf543274ea72ddd4eb634a16356531a5f4040b2a60d34fb12a5c72cbf22f"
+    },
+    {
+      "file": "A5.mp3",
+      "source": "https://tonejs.github.io/audio/salamander/A5.mp3",
+      "bytes": 45747,
+      "sha256": "9e5cee1fe9cf68b7193623d46a27c8956e572c1ff234ca0e11599b556050dec6"
+    }
+  ]
+}
