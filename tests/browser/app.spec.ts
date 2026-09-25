@@ -205,6 +205,25 @@ test('恢复声音尚在加载时再次切到后台，旧回调不能自动恢�
   await expect(page.locator('dialog')).toHaveCount(0);
   await expect(page.locator('#question-progress')).toHaveText('第 1 / 21 题');
 });
+test('Mac 原生后台事件暂停原题，继续后首次答案只保存一次', async ({ page }) => {
+  await setup(page, '练习');
+  const original = await degree(page);
+  const options = await page.locator('.answer').allTextContents();
+  await page.evaluate(() => window.dispatchEvent(new Event('trainer:background')));
+  await expect(page.getByRole('dialog')).toContainText('练习已暂停');
+  await page.getByRole('button', { name: '继续', exact: true }).click();
+  await expect(page.locator('#question')).toHaveText(String(original));
+  expect(await page.locator('.answer').allTextContents()).toEqual(options);
+  await page.getByRole('button', { name: names[original - 1], exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('trainer:background')));
+  await page.getByRole('button', { name: '继续', exact: true }).click();
+  await expect(page.locator('.answer:disabled')).toHaveCount(7);
+  await page.getByRole('button', { name: '结束本轮', exact: true }).click();
+  await page.getByRole('button', { name: '确认结束', exact: true }).click();
+  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('jianpu-solfege-trainer')!).sessions[0]);
+  expect(record.answers).toHaveLength(1);
+  expect(record.answers[0].degree).toBe(original);
+});
 for (const [width, height] of [[1440, 900], [1280, 720], [768, 1024], [390, 844], [320, 568]]) {
   test(`视觉视口 ${width}×${height}：首页、答题和反馈无横向溢出`, async ({ page }) => {
     await page.setViewportSize({ width, height });

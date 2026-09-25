@@ -31,7 +31,7 @@ export function homeView() {
       <button class="mode-card" data-action="setup-practice"><span class="mode-title">练习模式</span><span class="secondary-text">每题即时反馈，慢慢建立联系。</span><span class="card-link">进入练习 <span aria-hidden="true">→</span></span></button>
       <button class="mode-card" data-action="setup-exam"><span class="mode-title">考试模式</span><span class="secondary-text">交卷后查看结果，了解本轮表现。</span><span class="card-link">进入考试 <span aria-hidden="true">→</span></span></button>
     </div><p class="home-note">按自己的节奏来。没有倒计时，也不需要音乐基础。</p>
-    <footer class="local-note">记录保存在此浏览器 · 声音使用本地钢琴采样</footer></main>`;
+    <footer class="local-note">记录保存在本机 · 声音使用本地钢琴采样</footer></main>`;
 }
 export function setupView(mode: 'practice' | 'exam', settings: Settings) {
   const count = mode === 'practice' ? settings.practiceQuestionCount : settings.examQuestionCount;
@@ -147,5 +147,5 @@ export function historyView(sessions: SessionRecord[], filter: Mode | 'all') {
   return `<main class="page reading" id="main">${button('home', '← 返回首页', 'plain back')}<div class="section-heading page-heading"><h1 tabindex="-1">历史记录</h1>${sessions.length ? button('clear-history', '清空历史', 'plain') : ''}</div>
     <div class="segmented history-filter" role="group" aria-label="筛选模式">${(['all', 'practice', 'exam', 'reinforcement'] as const).map(mode => `<button data-action="filter" data-filter="${mode}" aria-pressed="${filter === mode}">${mode === 'all' ? '全部' : modeName(mode)}</button>`).join('')}</div>
     ${filtered.length ? `<div class="history-list">${filtered.map(s => `<button class="history-row" data-action="open-report" data-id="${escape(s.id)}"><span><strong>${modeName(s.mode)} · ${keyInfo(s.key).label} 大调</strong><span class="secondary-text">${dateLabel(s.endedAt)} · ${s.endedEarly ? '部分完成' : '已完成'}${s.legacySummaryOnly ? ' · 旧版摘要' : ''}</span></span><span class="history-count">正确 ${s.summary.correct} / 已答 ${s.summary.answered}<span aria-hidden="true"> →</span></span></button>`).join('')}</div>` : `<div class="empty-state"><p>${sessions.length ? '此模式还没有记录。' : '还没有记录。完成一轮后会保存在这里。'}</p>${button('home', '返回首页')}</div>`}
-    <p class="field-hint">最近 100 轮保存在此浏览器。清理网站数据或使用隐私模式可能影响保留。</p></main>`;
+    <p class="field-hint">最近 100 轮保存在本机，不在设备间同步。清理本地存储数据可能影响保留。</p></main>`;
 }

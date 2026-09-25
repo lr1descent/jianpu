@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:browser": "playwright test",
     "prepare:audio": "node scripts/prepare-audio.mjs",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "package:mac": "node scripts/package-macos.mjs",
+    "test:mac": "node scripts/test-macos.mjs"
   },
   "dependencies": {
     "tone": "^15.1.22"

@@ -330,8 +330,7 @@ document.addEventListener('pointerdown', event => {
     if (!control.contains(target)) control.open = false;
   });
 });
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) return;
+function pauseForBackground() {
   piano.stop();
   if (active()) interrupt();
   else {
@@ -340,7 +339,9 @@ document.addEventListener('visibilitychange', () => {
     const status = document.querySelector('#preview-status');
     if (status) status.textContent = '试听已暂停，点击音符继续。';
   }
-});
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseForBackground(); });
+window.addEventListener('trainer:background', pauseForBackground);
 piano.onInterruption = () => { if (active() && !muted(settings())) interrupt('浏览器或系统中断了音频，请点击启用声音。'); };
 setPianoVolume();
 render(false);
