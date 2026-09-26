@@ -52,7 +52,8 @@ export class Session {
     this.readyAt = this.now();
   }
   beginPlayback() {
-    if (this.config.module !== 'relative' || !['loading', 'answering', 'practiceFeedback', 'examAnswerRecorded'].includes(this.phase)) return false;
+    if (this.config.module === 'notation' && !this.currentAnswer) return false;
+    if (!['loading', 'answering', 'practiceFeedback', 'examAnswerRecorded'].includes(this.phase)) return false;
     this.afterPlayback = this.phase as Exclude<ActivePhase, 'listening'>;
     this.phase = 'listening';
     return true;
@@ -93,7 +94,7 @@ export class Session {
   suspend(reason?: string) {
     if (this.phase === 'result') return;
     const listening = this.phase === 'listening';
-    if (this.phase !== 'paused' && this.phase !== 'audioError') this.previousPhase = listening ? this.afterPlayback : this.phase;
+    if (this.phase !== 'paused' && this.phase !== 'audioError') this.previousPhase = this.phase;
     if (!this.currentAnswer && (listening || this.previousPhase !== 'loading')) this.interrupted = true;
     this.audioEverInterrupted = true;
     this.error = reason ?? '';
@@ -102,6 +103,7 @@ export class Session {
   resume() {
     if (this.phase !== 'paused' && this.phase !== 'audioError') return false;
     this.phase = this.previousPhase;
+    if (this.phase === 'listening') this.phase = this.afterPlayback;
     if (this.phase === 'loading') this.ready();
     return true;
   }

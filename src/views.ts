@@ -85,6 +85,10 @@ export function answerClass(session: Session, option: string) {
 export function nextLabel(session: Session) {
   return session.index < session.questions.length - 1 ? '下一题' : ({ practice: '查看练习小结', exam: '交卷并查看报告', reinforcement: '查看强化小结' }[session.config.mode]);
 }
+export function playbackStatus(session: Session) {
+  if (session.visiblePhase === 'listening') return '正在播放参考 do 与目标音…';
+  return session.currentAnswer ? '播放完成，可继续下一题。' : '请选择目标音的唱名。';
+}
 export function quizView(session: Session) {
   const q = session.question;
   const loading = session.visiblePhase === 'loading';
@@ -93,7 +97,7 @@ export function quizView(session: Session) {
   const relative = session.config.module === 'relative', listening = session.visiblePhase === 'listening';
   return `<main class="page quiz ${relative ? 'relative-quiz' : ''}" id="main"><div class="quiz-meta"><span>${info.label} 大调${relative ? '' : ` · 1=${info.label}`}</span><span id="question-progress">第 ${q.index + 1} / ${session.questions.length} 题</span></div>
     <progress class="quiz-progress" max="${session.questions.length}" value="${session.answers.length}" aria-label="已答题目"></progress>
-    ${loading ? `<div class="loading-stage" role="status"><h1 tabindex="-1">正在准备钢琴音色…</h1><p class="secondary-text">准备完成后再开始答题与计时。</p></div>` : `${relative ? `<div class="listening-stage"><h1 id="listening-title" tabindex="-1">听音选择唱名</h1><p id="playback-status" class="secondary-text" role="status">${listening ? '正在播放参考 do 与目标音…' : '请选择目标音的唱名。'}</p></div>` : `<div class="question-stage"><h1 id="question" class="question-number" tabindex="-1" aria-label="简谱数字 ${q.degree}">${q.degree}</h1></div>`}
+    ${loading ? `<div class="loading-stage" role="status"><h1 tabindex="-1">正在准备钢琴音色…</h1><p class="secondary-text">准备完成后再开始答题与计时。</p></div>` : `${relative ? `<div class="listening-stage"><h1 id="listening-title" tabindex="-1">听音选择唱名</h1><p id="playback-status" class="secondary-text" role="status">${playbackStatus(session)}</p></div>` : `<div class="question-stage"><h1 id="question" class="question-number" tabindex="-1" aria-label="简谱数字 ${q.degree}">${q.degree}</h1></div>`}
       <div class="replay-row">${button('replay', relative ? '重听 do 与目标音' : '重听', 'replay', listening ? 'disabled' : '')}</div>
       <div class="answers" role="group" aria-label="选择唱名">${q.options.map(option => `<button class="answer ${answerClass(session, option)}" data-action="answer" data-answer="${option}" ${locked ? 'disabled' : ''}>${option}</button>`).join('')}</div>
       <div class="feedback" id="feedback" role="status" aria-live="polite" aria-atomic="true">${feedbackView(session)}</div>

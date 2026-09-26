@@ -66,6 +66,29 @@ it('听音考试 DOM 没有题面数字、目标音名或正确项提示，答�
     expect(quizView(session)).not.toMatch(/answer correct|answer incorrect|正确唱名|目标音：|data-degree/);
   }
 });
+it('两模块答后播放锁定下一题，暂停恢复不改首次答案、耗时或手动重听次数', () => {
+  for (const module of ['notation', 'relative'] as const) for (const mode of ['practice', 'exam'] as const) {
+    let clock = 1000;
+    const session = new Session({ module, mode, key: 'D', count: 7, muted: false }, () => clock);
+    if (module === 'relative') { session.beginPlayback(); session.completePlayback(); } else session.ready();
+    clock = 1500;
+    session.submit(session.question.correctAnswer, false);
+    const original = structuredClone(session.currentAnswer);
+    expect(session.beginPlayback()).toBe(true);
+    expect(session.beginPlayback()).toBe(false);
+    expect(session.next()).toBe(false);
+    expect(session.submit('do', false)).toBe(false);
+    expect(quizView(session)).toMatch(/data-action="next"[^>]*disabled/);
+    session.suspend();
+    expect(session.visiblePhase).toBe('listening');
+    expect(session.completePlayback()).toBe(false);
+    session.resume(); session.beginPlayback(); clock = 5000; session.completePlayback();
+    expect(session.currentAnswer).toEqual(original);
+    expect(session.currentAnswer).toMatchObject({ reactionMs: 500, replaysBeforeAnswer: 0, replaysAfterAnswer: 0 });
+    expect(session.phase).toBe(mode === 'exam' ? 'examAnswerRecorded' : 'practiceFeedback');
+    expect(session.next()).toBe(true);
+  }
+});
 it('旧 v2 逐题记录和强化快照归入简谱，先备份再保存 v3，两个模块设置分离', () => {
   const exam = notationReport(), source = sourceSnapshot(exam, confusionPairs(exam.answers!));
   const reinforcement = new Session({ module: 'notation', mode: 'reinforcement', key: 'F#', count: 21, muted: false, source }).finish();

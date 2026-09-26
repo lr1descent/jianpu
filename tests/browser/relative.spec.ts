@@ -78,7 +78,7 @@ test('相对音程考试：完整七题均衡，未交卷不揭晓，报告按�
   await page.screenshot({ path: `${shots}/relative-exam-report-1280x720.png`, fullPage: true });
   const record = await page.evaluate(() => JSON.parse(localStorage.getItem('jianpu-solfege-trainer')!).sessions[0]);
   expect(record.answers.map((a: { degree: number }) => a.degree)).toEqual([2, 3, 4, 5, 6, 7, 1]);
-  expect(record.module).toBe('relative'); expect(await sounds(page)).toHaveLength(14);
+  expect(record.module).toBe('relative'); expect(await sounds(page)).toHaveLength(28);
   await page.getByRole('button', { name: '同设置重新考试' }).click();
   await ready(page); await expect(page.locator('.brand')).toContainText('相对音程');
 });
@@ -145,6 +145,8 @@ for (const [width, height] of [[1280, 720], [390, 844], [320, 568]]) {
     await expect(page.locator('.answer:disabled')).toHaveCount(7);
     expect((await next.boundingBox())!.y).toBe(before!.y);
     await page.screenshot({ path: `${shots}/relative-feedback-${width}x${height}.png`, fullPage: true });
+    await expect(next).toBeEnabled();
+    await expect(page.locator('#feedback')).toBeFocused();
     await page.keyboard.press('Tab'); await expect(next).toBeFocused(); await expect(next).toBeInViewport();
     await page.keyboard.press('Enter'); await ready(page);
     await expect(page.locator('#question-progress')).toHaveText('第 2 / 7 题');

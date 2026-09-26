@@ -9,7 +9,7 @@ import { DEGREES, KEYS, keyInfo, pitch } from './music';
 import { confusionPairs } from './confusion';
 import { sourceSnapshot } from './reinforcement';
 import { answerClass, escape, feedbackView, header, historyView, homeView, learnView, modeName, moduleView, muted,
-  nextLabel, quizView, resultView, reviewView, runningSummary, setupView, volumeLabel } from './views';
+  nextLabel, playbackStatus, quizView, resultView, reviewView, runningSummary, setupView, volumeLabel } from './views';
 import type { Degree, ExerciseModule, KeyId, Mode, ModuleSettings, ReinforcementSource, SessionRecord, Solfege } from './types';
 
 type Page = 'home' | 'module' | 'setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
@@ -105,16 +105,29 @@ async function playQuestion() {
   if (!active() || !session) return;
   const current = session, token = operation;
   try {
-    if (current.config.module === 'relative') {
-      if (muted(settings())) throw new Error('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
-      if (!current.beginPlayback()) return;
-      render();
-      const played = await piano.playPair(keyInfo(current.config.key).tonicMidi, current.question.midi);
-      if (played && token === operation && current === session && current.completePlayback()) render();
-    } else if (['answering', 'practiceFeedback', 'examAnswerRecorded'].includes(current.phase)) {
-      await piano.play(current.question.midi);
+    const relative = current.config.module === 'relative';
+    if (relative && muted(settings())) throw new Error('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
+    const locked = current.beginPlayback();
+    if (!locked && (relative || current.phase !== 'answering')) return;
+    if (locked) syncPlaybackControls();
+    const played = await (relative
+      ? piano.playPair(keyInfo(current.config.key).tonicMidi, current.question.midi)
+      : piano.play(current.question.midi));
+    // Explicitly muting notation cancels its sound but must still release the next button.
+    if (locked && (played || (!relative && muted(settings()))) && token === operation && current === session && current.completePlayback()) {
+      syncPlaybackControls();
     }
   } catch (error) { if (token === operation) interrupt(message(error)); }
+}
+function syncPlaybackControls() {
+  if (!session) return;
+  if (!app.querySelector('.answers')) { render(); return; }
+  const listening = session.phase === 'listening';
+  app.querySelectorAll<HTMLButtonElement>('.answer').forEach(button => { button.disabled = session!.phase !== 'answering'; });
+  app.querySelector<HTMLButtonElement>('[data-action="replay"]')!.disabled = listening;
+  app.querySelector<HTMLButtonElement>('[data-action="next"]')!.disabled = !session.currentAnswer || listening;
+  const status = app.querySelector('#playback-status');
+  if (status) status.textContent = playbackStatus(session);
 }
 async function presentQuestion() {
   if (!session) return;
@@ -160,6 +173,8 @@ function answer(selected: Solfege) {
   const feedback = document.querySelector<HTMLElement>('#feedback')!;
   feedback.tabIndex = -1;
   feedback.focus({ preventScroll: true });
+  // System feedback replays the question, not the selected option, and is not a manual replay.
+  void playQuestion();
 }
 function next() {
   if (!session || !active() || !['practiceFeedback', 'examAnswerRecorded'].includes(session.phase)) return;
@@ -208,12 +223,12 @@ async function resume(returnFocus?: HTMLElement) {
     if (!muted(settings())) await piano.initialize();
     if (token !== operation || !session) return;
     closeDialog();
-    const unanswered = !session.currentAnswer;
+    const needsPlayback = !session.currentAnswer || session.visiblePhase === 'listening';
     session.resume();
     if (session.visiblePhase === 'answering' && !document.querySelector('#question')) render();
     if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); else focusPage();
     soundUpdated();
-    if (unanswered) await playQuestion();
+    if (needsPlayback) await playQuestion();
   } catch (error) { if (token === operation) interrupt(message(error)); }
   finally { if (token === operation) busy = false; }
 }

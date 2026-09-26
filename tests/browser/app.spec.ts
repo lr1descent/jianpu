@@ -52,6 +52,7 @@ test('练习：实际音频采样、首次错选、重听、稳定反馈位置�
   expect(stored.sessions[0].answers[0].selected).toBe(names[Number(oldQuestion) % 7]);
 });
 test('考试：中性提交、35 题样本报告、主动选择强化和来源隔离', async ({ page }) => {
+  test.slow(); // Includes all 56 real post-answer piano replays.
   await page.setViewportSize({ width: 1440, height: 900 });
   await setup(page, '考试', 35);
   const wrong = new Map([[3, 2], [5, 1]]);
@@ -141,6 +142,7 @@ test('纯键盘完整流程、数字键无捷径、焦点公平、Escape 取消�
   await page.keyboard.press('Enter');
   await expect(page.locator('#question')).toHaveText(String(number));
   await page.keyboard.press('Enter'); await expect(page.locator('#question')).toHaveText(String(number));
+  await expect(page.locator('[data-action="next"]')).toBeEnabled();
   await page.keyboard.press('Tab'); await expect(page.locator('[data-action="next"]')).toBeFocused();
   await page.keyboard.press('Enter'); await expect(page.locator('#question-progress')).toHaveText('第 2 / 7 题');
   await page.getByRole('button', { name: '结束本轮' }).click();
