@@ -15,7 +15,10 @@
     "prepare:audio": "node scripts/prepare-audio.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "package:mac": "node scripts/package-macos.mjs",
-    "test:mac": "node scripts/test-macos.mjs"
+    "test:mac": "node scripts/test-macos.mjs",
+    "package:windows": "node scripts/package-windows.mjs",
+    "test:windows": "node --test --test-timeout=60000 tests/windows/*.test.mjs",
+    "test:desktop": "node scripts/test-desktop.mjs"
   },
   "dependencies": {
     "tone": "^15.1.22"
@@ -23,6 +26,8 @@
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.13.6",
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
     "vitest": "^3.2.4"

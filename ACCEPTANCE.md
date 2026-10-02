@@ -2,6 +2,27 @@
 
 日期：2026-09-26。依据 `jianpu_solfege_trainer_requirements_v0.1.2.md` 第 12.5、12.6、15 节及 0.1.2 视觉方案。下方保留上一版验收记录，旧记录中的 schema v2 和单模块描述仅属于历史版本。
 
+## Windows 便携 EXE 验收（2026-09-26）
+
+交付 `artifacts/windows/简谱唱名-0.1.2-Windows-x64.exe`，约 95 MiB，目标 Windows 10/11 x64（Intel/AMD）。包含原有两个模块及答后自动重播；Mac 原生包和前端业务源码未改动。Electron 44.4.5 / Electron Builder 26.15.3，NSIS portable 单文件启动，不要求用户安装 Node.js、WebView2 或联网。
+
+| 检查 | 结果 |
+| --- | --- |
+| 31 项单元测试、TypeScript、生产构建 | 通过 |
+| `npm run test:windows` | 3 项通过；协议测试包含 GET/HEAD、音频 MIME、来源与路径限制、未知文件；包测试实际解开交付 EXE，再解开内嵌压缩包 |
+| 产物完整性 | 外层 Windows PE 启动器、内层 x64 PE 主程序、Chromium 资源与许可证均存在；解包 ASAR 与构建文件哈希相同，所有生产页面文件和 8 份钢琴采样逐一校验通过；无多余 node_modules |
+| 新用户目录 | 首次启动创建不存在的用户数据目录；Chromium sessionData 指向同一目录，便携解压目录不参与历史持久化 |
+| `npm run test:desktop` | 使用交付 EXE 内的同一份 app.asar，在 macOS arm64 Electron 上实际执行并通过；测试数据使用独立临时目录 |
+| 桌面实际行为 | 本地采样可加载、相对练习可选答、答后双音重播期间锁定操作、完成后解锁且反馈焦点保持；Tab/Enter 推进下一题；200% 菜单缩放后操作可达 |
+| 生命周期 | 真正最小化窗口会暂停，恢复保留题目；关闭进行中轮次触发真实退出处理，测试在原生确认函数返回“取消”后验证原题保留且暂停 |
+| 历史保存 | 保存部分练习后退出进程，重新启动同一独立目录，历史仍在且标为相对音程练习 |
+| 页面权限 | 页面未暴露 Node require 或 ipcRenderer，预加载只报告轮次状态，资源来自固定 jianpu://trainer 来源 |
+| 来源与签名 | 官方 Electron/Builder 下载源；图标沿用原 Mac 图标；未进行商业代码签名，Windows 可能显示未知发布者 |
+
+最终 SHA-256：`be70a5b50e9d90c524f1519cf013a889a21588fd9f76ea2a46ebbad9c701d62e`，旁附同名 `.sha256` 和使用说明。Windows 历史位置 `%APPDATA%\JianpuSolfege`；Mac、浏览器和 Windows 各自独立，不自动同步。旧 0.1.0 文档哈希不变。
+
+**验证边界：没有在 Windows 真机/虚拟机运行此 EXE。** 外层启动器解压与程序启动的 Windows 系统行为、Windows 声卡听验、SmartScreen 与跨机器信任尚未实测。macOS 上同份 ASAR 的 Electron 实测不能代替 Windows GUI 验收。首次桌面测试的运行时下载超时，以及测试断言中的浮点精度/同名按钮定位问题已处理；最终测试完整通过。
+
 ## 答后自动重播补充验收（2026-09-26，build 3）
 
 - 两模块的练习与考试在首次选答后自动播放当前题，简谱强化复用同一行为。简谱播放数字对应单音，相对音程播放参考 do 与目标音；答对、答错一致，不播放误选项的音。

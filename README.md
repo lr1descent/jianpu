@@ -2,6 +2,14 @@
 
 看数字，听钢琴，选唱名。按 `jianpu_solfege_trainer_requirements_v0.1.2.md` 实现的本地网页应用，采用 Vite、TypeScript、原生 HTML/CSS 与 Tone.js。0.1.2 在原有简谱识读基础上增加相对音程，保留原有音乐规则、强化流程和历史记录。
 
+## Windows 应用
+
+Windows 10/11 的 **64 位 Intel/AMD** 电脑可直接运行 `artifacts/windows/简谱唱名-0.1.2-Windows-x64.exe`。这是便携版，无需安装 Node.js、WebView2 或连接外网；首次打开需要等待内置运行时解压。两个练习模块和选答后的自动重播均包含在内。
+
+历史和设置保存在 `%APPDATA%\JianpuSolfege`，移动或替换 EXE 不会清除；Mac、浏览器和 Windows 记录各自独立。Tab / Enter / 空格操作，Ctrl + / Ctrl − 缩放、Ctrl 0 还原；切换窗口/最小化会暂停，进行中关闭会确认。
+
+此 EXE 未进行商业代码签名，Windows 可能显示未知发布者提示。构建、校验值、使用说明和验证边界见 `native/windows/README.md` 与 `ACCEPTANCE.md`。可用 `npm run package:windows` 重建、`npm run test:windows` 检查实际 EXE，`npm run test:desktop` 验证打包后的桌面功能。
+
 ## Mac 应用
 
 已提供原生 macOS 应用，适用于 **Apple Silicon（M 系列）Mac、macOS 13 或更新版本**：
