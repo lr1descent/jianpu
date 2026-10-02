@@ -18,14 +18,17 @@
     "test:mac": "node scripts/test-macos.mjs",
     "package:windows": "node scripts/package-windows.mjs",
     "test:windows": "node --test --test-timeout=60000 tests/windows/*.test.mjs",
-    "test:desktop": "node scripts/test-desktop.mjs"
+    "test:desktop": "node scripts/test-desktop.mjs",
+    "deploy": "cf deploy"
   },
   "dependencies": {
     "tone": "^15.1.22"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "beta",
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.13.6",
+    "cf": "^1.0.0-beta.10",
     "electron": "44.4.5",
     "electron-builder": "26.15.3",
     "typescript": "^5.9.3",
