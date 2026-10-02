@@ -1,1 +1,1 @@
-{"name":"jianpu-solfege-trainer","compatibilityDate":"2026-09-30","assets":{"notFoundHandling":"single-page-application"},"observability":{"enabled":true}}
+{"name":"jianpu-solfege-trainer","compatibilityDate":"2026-09-30","assets":{"notFoundHandling":"single-page-application"},"domains":["music.chihayaanon.cloud"],"observability":{"enabled":true},"workersDev":true}
