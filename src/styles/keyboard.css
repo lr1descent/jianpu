@@ -1,4 +1,3 @@
-.keyboard-entry { grid-column: 1 / -1; }
 .keyboard-directions { display: grid; gap: var(--space-3); }
 .direction-choice { display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-4); border: 1px solid var(--control-border); border-radius: var(--radius-control); cursor: pointer; }
 .direction-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }

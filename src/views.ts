@@ -31,10 +31,11 @@ export function header(settings: Settings, session?: { config: { module: Exercis
 }
 export function homeView() {
   return `<main class="home page" id="main"><div class="home-intro"><h1 tabindex="-1">从一个音开始。</h1><p>认识唱名，听见音程，也找到琴键的位置。</p></div>
-    <div class="mode-grid">
+    <div class="mode-grid exercise-grid">
       <button class="mode-card" data-action="module" data-module="notation"><span class="mode-title">简谱识读</span><span class="secondary-text">看数字，听钢琴，选唱名。</span><span class="card-link">进入模块 <span aria-hidden="true">→</span></span></button>
       <button class="mode-card" data-action="module" data-module="relative"><span class="mode-title">相对音程</span><span class="secondary-text">先听 do，再辨认目标音的唱名。</span><span class="card-link">进入模块 <span aria-hidden="true">→</span></span></button>
-      <button class="mode-card keyboard-entry" data-action="keyboard-module"><span class="mode-title">钢琴键盘音位识别</span><span class="secondary-text" lang="en">Keyboard Note Identification</span><span>音名 → 琴键 · 琴键 → 音名</span><span class="card-link">进入练习 <span aria-hidden="true">→</span></span></button>
+      <button class="mode-card" data-action="keyboard-module"><span class="mode-title">钢琴键盘音位识别</span><span class="secondary-text">音名 → 琴键 · 琴键 → 音名</span><span class="card-link">进入练习 <span aria-hidden="true">→</span></span></button>
+      <button class="mode-card" data-action="singing-module"><span class="mode-title">模唱练耳</span><span class="secondary-text">弹奏钢琴，听音跟唱。自由切换音区，支持横屏沉浸。</span><span class="card-link">打开钢琴 <span aria-hidden="true">→</span></span></button>
     </div><p class="home-note">选择想练习的能力，按自己的节奏来。</p>
     <footer class="local-note">记录保存在本机 · 声音使用本地钢琴采样</footer></main>`;
 }

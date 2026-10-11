@@ -4,6 +4,7 @@ import { midiToHz } from './music';
 export interface PianoAudio {
   initialize(): Promise<void>; play(midi: number): Promise<boolean>;
   playPair(reference: number, target: number): Promise<boolean>; stop(): void;
+  press(midi: number): boolean; release(midi: number): void;
   setVolume(volume: number, muted: boolean): void;
   onInterruption: (() => void) | null;
   readonly status: 'idle' | 'loading' | 'ready' | 'suspended' | 'error';
@@ -56,6 +57,14 @@ export class Piano implements PianoAudio {
   }
   play(midi: number) { return this.playNotes([midi]); }
   playPair(reference: number, target: number) { return this.playNotes([reference, target]); }
+  press(midi: number) {
+    if (this.muted) return false;
+    if (this.status !== 'ready') throw new Error('声音尚未就绪，请点击启用声音。');
+    // Free playing has no quiz lead-in or global stop: simultaneous keys remain independent.
+    this.sampler!.triggerAttack(midiToHz(midi), Tone.immediate(), 0.65);
+    return true;
+  }
+  release(midi: number) { this.sampler?.triggerRelease(midiToHz(midi), Tone.immediate()); }
   private playNotes(midis: readonly number[]): Promise<boolean> {
     this.stop();
     if (this.muted) return Promise.resolve(false);

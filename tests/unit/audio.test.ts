@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   context: { state: 'running', on: vi.fn() }, start: vi.fn(), attack: vi.fn(), stop: vi.fn(), dispose: vi.fn(),
   ramp: vi.fn(), constructors: vi.fn(), failSample: false,
+  press: vi.fn(), release: vi.fn(),
 }));
 vi.mock('tone', () => ({
   start: state.start,
@@ -17,6 +18,8 @@ vi.mock('tone', () => ({
     }
     connect() { return this; }
     triggerAttackRelease = state.attack;
+    triggerAttack = state.press;
+    triggerRelease = state.release;
     releaseAll = state.stop;
     dispose = state.dispose;
   },
@@ -79,4 +82,32 @@ it('主动静音可无采样继续；非主动静音时挂起必须报错并发�
   expect(() => piano.play(60)).toThrow('声音尚未就绪');
   const interrupted = vi.fn(); piano.onInterruption = interrupted;
   state.context.on.mock.calls[0][1](); expect(interrupted).toHaveBeenCalledOnce();
+});
+it('自由弹奏直接按下/释放指定音，快速连续按键不截断其他键或改变练习时序', async () => {
+  const piano = new Piano(); await piano.initialize(); vi.useFakeTimers();
+  expect(piano.press(48)).toBe(true);
+  expect(piano.press(60)).toBe(true);
+  expect(piano.press(61)).toBe(true);
+  expect(state.press.mock.calls.map(call => call[0])).toEqual([48, 60, 61].map(midiToHzForTest));
+  expect(state.press).toHaveBeenLastCalledWith(midiToHzForTest(61), 4.9, .65);
+  expect(state.stop).not.toHaveBeenCalled();
+  piano.release(60);
+  expect(state.release).toHaveBeenCalledExactlyOnceWith(midiToHzForTest(60), 4.9);
+  piano.stop();
+  expect(state.stop).toHaveBeenCalledOnce();
+  const quiz = piano.play(69);
+  expect(state.attack).not.toHaveBeenCalled();
+  await vi.runAllTimersAsync(); await expect(quiz).resolves.toBe(true);
+  expect(state.attack).toHaveBeenLastCalledWith(440, .8, 5, .65);
+});
+it('自由弹奏静音不发声，未准备和音频挂起明确报错', async () => {
+  const piano = new Piano();
+  expect(() => piano.press(60)).toThrow('声音尚未就绪');
+  await piano.initialize(); piano.press(60);
+  piano.setVolume(.3, true);
+  expect(piano.press(62)).toBe(false);
+  expect(state.press).toHaveBeenCalledOnce();
+  expect(state.stop).toHaveBeenCalledOnce();
+  piano.setVolume(.3, false); state.context.state = 'suspended';
+  expect(() => piano.press(60)).toThrow('声音尚未就绪');
 });

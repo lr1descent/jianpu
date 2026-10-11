@@ -4,7 +4,10 @@ import './styles/components.css';
 import './styles/views.css';
 import './styles/keyboard.css';
 import './styles/motion.css';
+import './styles/singing.css';
 import { Piano } from './audio';
+import { mountSinging } from './singing';
+import { DEFAULT_SINGING_PREFERENCES, singingView } from './singing-view';
 import { animateList, updateList } from './list-motion';
 import { Session, type SessionConfig } from './session';
 import { KeyboardSession, type KeyboardSessionConfig } from './keyboard-session';
@@ -18,7 +21,7 @@ import { answerClass, escape, feedbackView, header, historyResultsView, historyV
   nextLabel, playbackStatus, quizView, resultView, reviewView, runningSummary, setupView, volumeLabel } from './views';
 import type { Degree, ExerciseModule, KeyboardDirection, KeyId, Mode, ModuleSettings, PitchClass, PracticeRecord, ReinforcementSource, Solfege, SolfegeModule } from './types';
 
-type Page = 'home' | 'module' | 'setup' | 'keyboard-setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
+type Page = 'home' | 'module' | 'setup' | 'keyboard-setup' | 'singing' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
 const app = document.querySelector<HTMLDivElement>('#app')!;
 // Accessing localStorage itself can fail in restricted browsing contexts.
 const storage = new LocalStore({
@@ -38,6 +41,8 @@ let historyFilter: Mode | 'all' = 'all';
 let historyModule: ExerciseModule | 'all' = 'all';
 let historyDirection: KeyboardDirection | 'all' = 'all';
 let stopHistoryAnimation: (() => void) | undefined;
+let singing: ReturnType<typeof mountSinging> | undefined;
+let singingPreferences = { ...DEFAULT_SINGING_PREFERENCES };
 let operation = 0;
 let busy = false;
 const settings = () => storage.data.settings;
@@ -54,21 +59,26 @@ function noticeView() {
   return storage.notice ? `<aside class="storage-notice" role="status"><p>${escape(storage.notice)}</p><button class="button secondary" data-action="retry-save">重试保存</button></aside>` : '';
 }
 function render(focus = true) {
+  singing?.dispose();
+  singing = undefined;
   stopHistoryAnimation?.();
   stopHistoryAnimation = undefined;
   document.body.classList.toggle('is-quiz', page === 'quiz');
   const views: Record<Page, () => string> = {
     home: homeView, module: () => moduleView(exerciseModule), setup: () => setupView(exerciseModule, setupMode, viewSettings()),
     'keyboard-setup': () => keyboardSetupView(settings().modules.keyboard, settings()),
+    singing: () => singingView(settings(), singingPreferences),
     quiz: () => session instanceof KeyboardSession ? keyboardQuizView(session, muted(settings())) : quizView(session!),
     learn: () => learnView(viewSettings()), history: () => historyView(storage.data.sessions, historyFilter, historyModule, historyDirection),
     review: () => reviewView(reinforcement!, settings()),
     result: () => report?.module === 'keyboard' ? keyboardResultView(report) : resultView(report!, selectedPairs, storage.data.sessions.some(s => s.id === report?.reinforcementSource?.examId)),
   };
-  app.innerHTML = `${header(settings(), page === 'quiz' ? session : undefined)}${noticeView()}${views[page]()}`;
+  app.innerHTML = `${page === 'singing' ? '' : header(settings(), page === 'quiz' ? session : undefined)}${noticeView()}${views[page]()}`;
   updateMutedNote();
   if (focus) focusPage();
   if (page === 'history') stopHistoryAnimation = animateList(app.querySelector<HTMLElement>('#history-results')!);
+  if (page === 'singing') singing = mountSinging({ root: app.querySelector<HTMLElement>('.singing-piano')!, audio: piano,
+    preferences: singingPreferences, onPreference: preferences => { singingPreferences = preferences; }, isMuted: () => muted(settings()) });
 }
 function updateHistory() {
   const selected = { 'filter-module': historyModule, filter: historyFilter, 'filter-direction': historyDirection };
@@ -327,6 +337,7 @@ app.addEventListener('click', event => {
   switch (action) {
     case 'home': navigate('home'); break;
     case 'keyboard-module': navigate('keyboard-setup'); break;
+    case 'singing-module': navigate('singing'); break;
     case 'module':
       if (target.dataset.module === 'notation' || target.dataset.module === 'relative') exerciseModule = target.dataset.module;
       navigate('module'); break;
@@ -381,6 +392,7 @@ function soundUpdated() {
   const mute = app.querySelector<HTMLInputElement>('#mute');
   if (mute) mute.checked = settings().muted;
   updateMutedNote();
+  singing?.soundUpdated();
   if (!active() || !session) return;
   if (session.config.module === 'relative' && muted(settings())) {
     interrupt('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
@@ -448,6 +460,7 @@ document.addEventListener('pointerdown', event => {
 });
 function pauseForBackground() {
   piano.stop();
+  singing?.interrupt();
   if (active()) interrupt();
   else {
     operation++;
@@ -458,6 +471,10 @@ function pauseForBackground() {
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseForBackground(); });
 window.addEventListener('trainer:background', pauseForBackground);
-piano.onInterruption = () => { if (active() && !muted(settings())) interrupt('浏览器或系统中断了音频，请点击启用声音。'); };
+piano.onInterruption = () => {
+  if (muted(settings())) return;
+  if (active()) interrupt('浏览器或系统中断了音频，请点击启用声音。');
+  singing?.interrupt('浏览器或系统中断了音频，请点击启用声音。');
+};
 setPianoVolume();
 render(false);
