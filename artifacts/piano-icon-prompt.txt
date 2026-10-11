@@ -1,0 +1,7 @@
+Tool: built-in image_gen
+Generated for: piano ear-training website icon and iPhone Home Screen icon
+Assets: public/icons/piano.png (512x512), public/apple-touch-icon.png (180x180), public/favicon.png (32x32)
+The generated square artwork was resized with macOS sips for these standard icon sizes.
+
+Final prompt:
+Use case: logo-brand. Create one finished square app icon image for a piano ear-training web app, 1024 by 1024. Subject: a beautifully simple piano keyboard seen straight from above, centered and instantly recognizable at tiny iPhone home-screen size. Seven ivory-white keys C D E F G A B and exactly five charcoal black keys in the musically correct two-then-three grouping (between C/D, D/E, F/G, G/A, A/B); black keys are shorter, white keys long. A compact dark charcoal upper piano casing connects the keys; one restrained thin blue accent line on the casing matches a calm blue-and-white learning app. Composition: large graphic fills roughly the central 78 percent of the square, balanced padding, all essential details within the central safe area. Style: crisp refined flat illustration, bold simple geometry, subtly rounded key ends, clean silhouette, minimal depth, excellent contrast. Background is solid warm off-white extending fully to all four edges. Output is the icon artwork itself, full bleed square; no pre-rounded outer icon mask, no phone mockup, no outside frame, no text, no letters, no music notes, no watermark, no hands, no scenery. Opaque background.
