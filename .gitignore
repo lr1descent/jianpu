@@ -1,16 +1,23 @@
+# Dependencies
 node_modules/
+
+# Build output and packaged applications
 dist/
-test-results/
-playwright-report/
-.DS_Store
 .build/
+.cloudflare/
 artifacts/macos/
 artifacts/windows/
 
-# wrangler files
-.wrangler
-.cloudflare/state/
+# Test reports
+test-results/
+playwright-report/
+
+# Local Cloudflare state and environment variables
+.wrangler/
 .dev.vars*
 !.dev.vars.example
 .env*
 !.env.example
+
+# macOS metadata
+.DS_Store
