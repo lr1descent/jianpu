@@ -9,6 +9,7 @@ artifacts/windows/
 
 # wrangler files
 .wrangler
+.cloudflare/state/
 .dev.vars*
 !.dev.vars.example
 .env*

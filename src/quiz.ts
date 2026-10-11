@@ -10,9 +10,13 @@ export function shuffle<T>(items: readonly T[], random: Random = Math.random): T
   return result;
 }
 export function balancedSequence(count: QuestionCount, random: Random = Math.random): Degree[] {
-  const sequence: Degree[] = [];
+  return balancedBag(DEGREES, count, random);
+}
+export function balancedBag<T>(items: readonly T[], count: number, random: Random = Math.random): T[] {
+  if (items.length < 2 || !Number.isInteger(count) || count <= 0 || count % items.length !== 0) throw new Error('题数必须是音符数量的正整数倍');
+  const sequence: T[] = [];
   while (sequence.length < count) {
-    const bag = shuffle(DEGREES, random);
+    const bag = shuffle(items, random);
     if (bag[0] === sequence.at(-1)) [bag[0], bag[1]] = [bag[1], bag[0]];
     sequence.push(...bag);
   }

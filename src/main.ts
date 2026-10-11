@@ -2,17 +2,23 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/components.css';
 import './styles/views.css';
+import './styles/keyboard.css';
+import './styles/motion.css';
 import { Piano } from './audio';
+import { animateList, updateList } from './list-motion';
 import { Session, type SessionConfig } from './session';
+import { KeyboardSession, type KeyboardSessionConfig } from './keyboard-session';
+import { keyboardMidi } from './keyboard';
+import { keyboardAnswerClass, keyboardFeedbackView, keyboardPlaybackStatus, keyboardQuizView, keyboardResultView, keyboardSetupView, pianoKeyboardView } from './keyboard-views';
 import { LocalStore } from './storage';
 import { DEGREES, KEYS, keyInfo, pitch } from './music';
 import { confusionPairs } from './confusion';
 import { sourceSnapshot } from './reinforcement';
-import { answerClass, escape, feedbackView, header, historyView, homeView, learnView, modeName, moduleView, muted,
+import { answerClass, escape, feedbackView, header, historyResultsView, historyView, homeView, learnView, modeName, moduleView, muted,
   nextLabel, playbackStatus, quizView, resultView, reviewView, runningSummary, setupView, volumeLabel } from './views';
-import type { Degree, ExerciseModule, KeyId, Mode, ModuleSettings, ReinforcementSource, SessionRecord, Solfege } from './types';
+import type { Degree, ExerciseModule, KeyboardDirection, KeyId, Mode, ModuleSettings, PitchClass, PracticeRecord, ReinforcementSource, Solfege, SolfegeModule } from './types';
 
-type Page = 'home' | 'module' | 'setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
+type Page = 'home' | 'module' | 'setup' | 'keyboard-setup' | 'quiz' | 'result' | 'learn' | 'history' | 'review';
 const app = document.querySelector<HTMLDivElement>('#app')!;
 // Accessing localStorage itself can fail in restricted browsing contexts.
 const storage = new LocalStore({
@@ -22,14 +28,16 @@ const storage = new LocalStore({
 });
 const piano = new Piano();
 let page: Page = 'home';
-let exerciseModule: ExerciseModule = 'notation';
+let exerciseModule: SolfegeModule = 'notation';
 let setupMode: 'practice' | 'exam' = 'practice';
-let session: Session | undefined;
-let report: SessionRecord | undefined;
+let session: Session | KeyboardSession | undefined;
+let report: PracticeRecord | undefined;
 let reinforcement: ReinforcementSource | undefined;
 let selectedPairs = new Set<string>();
 let historyFilter: Mode | 'all' = 'all';
 let historyModule: ExerciseModule | 'all' = 'all';
+let historyDirection: KeyboardDirection | 'all' = 'all';
+let stopHistoryAnimation: (() => void) | undefined;
 let operation = 0;
 let busy = false;
 const settings = () => storage.data.settings;
@@ -46,16 +54,33 @@ function noticeView() {
   return storage.notice ? `<aside class="storage-notice" role="status"><p>${escape(storage.notice)}</p><button class="button secondary" data-action="retry-save">重试保存</button></aside>` : '';
 }
 function render(focus = true) {
+  stopHistoryAnimation?.();
+  stopHistoryAnimation = undefined;
   document.body.classList.toggle('is-quiz', page === 'quiz');
   const views: Record<Page, () => string> = {
-    home: homeView, module: () => moduleView(exerciseModule), setup: () => setupView(exerciseModule, setupMode, viewSettings()), quiz: () => quizView(session!),
-    learn: () => learnView(viewSettings()), history: () => historyView(storage.data.sessions, historyFilter, historyModule),
+    home: homeView, module: () => moduleView(exerciseModule), setup: () => setupView(exerciseModule, setupMode, viewSettings()),
+    'keyboard-setup': () => keyboardSetupView(settings().modules.keyboard, settings()),
+    quiz: () => session instanceof KeyboardSession ? keyboardQuizView(session, muted(settings())) : quizView(session!),
+    learn: () => learnView(viewSettings()), history: () => historyView(storage.data.sessions, historyFilter, historyModule, historyDirection),
     review: () => reviewView(reinforcement!, settings()),
-    result: () => resultView(report!, selectedPairs, storage.data.sessions.some(s => s.id === report?.reinforcementSource?.examId)),
+    result: () => report?.module === 'keyboard' ? keyboardResultView(report) : resultView(report!, selectedPairs, storage.data.sessions.some(s => s.id === report?.reinforcementSource?.examId)),
   };
   app.innerHTML = `${header(settings(), page === 'quiz' ? session : undefined)}${noticeView()}${views[page]()}`;
   updateMutedNote();
   if (focus) focusPage();
+  if (page === 'history') stopHistoryAnimation = animateList(app.querySelector<HTMLElement>('#history-results')!);
+}
+function updateHistory() {
+  const selected = { 'filter-module': historyModule, filter: historyFilter, 'filter-direction': historyDirection };
+  app.querySelectorAll<HTMLButtonElement>('.history-filter button').forEach(button => {
+    const action = button.dataset.action as keyof typeof selected;
+    const value = button.dataset.module ?? button.dataset.filter ?? button.dataset.direction;
+    button.setAttribute('aria-pressed', String(value === selected[action]));
+    button.hidden = historyModule === 'relative' && value === 'reinforcement';
+  });
+  app.querySelector<HTMLElement>('#history-direction-filter')!.hidden = historyModule !== 'keyboard';
+  app.querySelector<HTMLElement>('#history-mode-filter')!.hidden = historyModule === 'keyboard';
+  updateList(app.querySelector<HTMLElement>('#history-results')!, historyResultsView(storage.data.sessions, historyFilter, historyModule, historyDirection));
 }
 function navigate(next: Page) {
   operation++;
@@ -65,7 +90,7 @@ function navigate(next: Page) {
   render();
   window.scrollTo(0, 0);
 }
-function openReport(value: SessionRecord) {
+function openReport(value: PracticeRecord) {
   report = value;
   selectedPairs = new Set(value.mode === 'exam' && value.answers ? confusionPairs(value.answers).map(p => `${p.a}-${p.b}`) : []);
   navigate('result');
@@ -102,18 +127,18 @@ function updateMutedNote() {
   if (note) note.textContent = muted(settings()) ? ' 当前已静音，本轮会记录静音状态。' : '';
 }
 async function playQuestion() {
-  if (!active() || !session) return;
+  if (!active() || !session || (session instanceof KeyboardSession && !session.shouldPlay)) return;
   const current = session, token = operation;
   try {
-    const relative = current.config.module === 'relative';
+    const relative = current instanceof Session && current.config.module === 'relative';
     if (relative && muted(settings())) throw new Error('相对音程需要声音。请取消静音并设置大于 0 的音量，再继续本题。');
     const locked = current.beginPlayback();
     if (!locked && (relative || current.phase !== 'answering')) return;
     if (locked) syncPlaybackControls();
-    const played = await (relative
-      ? piano.playPair(keyInfo(current.config.key).tonicMidi, current.question.midi)
+    const played = await (current instanceof KeyboardSession ? piano.play(keyboardMidi(current.question.pitchClass))
+      : relative ? piano.playPair(keyInfo(current.config.key).tonicMidi, current.question.midi)
       : piano.play(current.question.midi));
-    // Explicitly muting notation cancels its sound but must still release the next button.
+    // Explicit muting cancels optional sound but must still release the controls.
     if (locked && (played || (!relative && muted(settings()))) && token === operation && current === session && current.completePlayback()) {
       syncPlaybackControls();
     }
@@ -121,27 +146,28 @@ async function playQuestion() {
 }
 function syncPlaybackControls() {
   if (!session) return;
-  if (!app.querySelector('.answers')) { render(); return; }
+  if (!app.querySelector('.answers, #keyboard-stage')) { render(); return; }
   const listening = session.phase === 'listening';
-  app.querySelectorAll<HTMLButtonElement>('.answer').forEach(button => { button.disabled = session!.phase !== 'answering'; });
-  app.querySelector<HTMLButtonElement>('[data-action="replay"]')!.disabled = listening;
+  app.querySelectorAll<HTMLButtonElement>('.answer, button.piano-key').forEach(button => { button.disabled = session!.phase !== 'answering'; });
+  const replay = app.querySelector<HTMLButtonElement>('[data-action="replay"]');
+  if (replay) replay.disabled = listening;
   app.querySelector<HTMLButtonElement>('[data-action="next"]')!.disabled = !session.currentAnswer || listening;
   const status = app.querySelector('#playback-status');
-  if (status) status.textContent = playbackStatus(session);
+  if (status) status.textContent = session instanceof KeyboardSession ? keyboardPlaybackStatus(session, muted(settings())) : playbackStatus(session);
 }
 async function presentQuestion() {
   if (!session) return;
-  if (session.config.module === 'notation') session.ready();
+  session.ready(muted(settings()));
   render();
   await playQuestion();
 }
-async function start(config: SessionConfig) {
+async function start(config: SessionConfig | KeyboardSessionConfig) {
   if (busy || active()) return;
   busy = true;
   const token = ++operation;
   piano.stop();
   setPianoVolume();
-  session = new Session(config);
+  session = config.module === 'keyboard' ? new KeyboardSession(config) : new Session(config);
   page = 'quiz';
   render();
   window.scrollTo(0, 0);
@@ -157,13 +183,33 @@ function startMain(mode = setupMode, key = moduleSettings().key, count = mode ==
   void start({ module, mode, key, count, muted: muted(settings()) });
 }
 function answer(selected: Solfege) {
-  if (!active() || !session?.submit(selected, muted(settings()))) return;
+  if (!active() || !(session instanceof Session) || !session.submit(selected, muted(settings()))) return;
+  const current = session;
   // Update the existing live region and controls in place; no layout or option reshuffle.
   app.querySelectorAll<HTMLButtonElement>('.answer').forEach(button => {
     button.disabled = true;
-    button.className = `answer ${answerClass(session!, button.dataset.answer!)}`;
+    button.className = `answer ${answerClass(current, button.dataset.answer!)}`;
   });
   document.querySelector('#feedback')!.innerHTML = feedbackView(session);
+  updateAnswerProgress();
+  // System feedback replays the question, not the selected option, and is not a manual replay.
+  void playQuestion();
+}
+function answerKeyboard(selected: PitchClass) {
+  if (!active() || !(session instanceof KeyboardSession) || !session.submit(selected, muted(settings()))) return;
+  const current = session;
+  app.querySelector('#keyboard-stage')!.innerHTML = pianoKeyboardView(current);
+  app.querySelectorAll<HTMLButtonElement>('.keyboard-note-options .answer').forEach(button => {
+    button.disabled = true;
+    button.className = `answer ${keyboardAnswerClass(current, Number(button.dataset.pitch))}`;
+  });
+  app.querySelector('#feedback')!.innerHTML = keyboardFeedbackView(current);
+  updateAnswerProgress();
+  syncPlaybackControls();
+  void playQuestion();
+}
+function updateAnswerProgress() {
+  if (!session) return;
   document.querySelector('#running-summary')!.textContent = runningSummary(session);
   (document.querySelector('.quiz-progress') as HTMLProgressElement).value = session.answers.length;
   const next = document.querySelector<HTMLButtonElement>('[data-action="next"]')!;
@@ -173,8 +219,6 @@ function answer(selected: Solfege) {
   const feedback = document.querySelector<HTMLElement>('#feedback')!;
   feedback.tabIndex = -1;
   feedback.focus({ preventScroll: true });
-  // System feedback replays the question, not the selected option, and is not a manual replay.
-  void playQuestion();
 }
 function next() {
   if (!session || !active() || !['practiceFeedback', 'examAnswerRecorded'].includes(session.phase)) return;
@@ -206,7 +250,7 @@ function pauseDialog() {
   const failed = session.phase === 'audioError';
   const requiresSound = session.config.module === 'relative';
   showDialog(failed ? '声音需要恢复' : `${modeName(session.config.mode)}已暂停`,
-    failed ? session.error : '本题和已提交的答案已保留。点击继续后恢复声音；中断前未作答的题目不计入速度统计。',
+    failed ? session.error : '本题和已提交的答案已保留。点击继续后恢复练习与声音；中断前未作答的题目不计入速度统计。',
     [{ label: requiresSound && muted(settings()) ? (settings().volume === 0 ? '启用声音（30%）并继续' : '取消静音并继续') : failed ? '重试 / 启用声音' : '继续', primary: true, run: () => {
       if (requiresSound && muted(settings())) { storage.updateSettings({ ...settings(), muted: false, volume: settings().volume || 0.3 }); setPianoVolume(); }
       void resume();
@@ -224,8 +268,9 @@ async function resume(returnFocus?: HTMLElement) {
     if (token !== operation || !session) return;
     closeDialog();
     const needsPlayback = !session.currentAnswer || session.visiblePhase === 'listening';
-    session.resume();
+    session.resume(muted(settings()));
     if (session.visiblePhase === 'answering' && !document.querySelector('#question')) render();
+    syncPlaybackControls();
     if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); else focusPage();
     soundUpdated();
     if (needsPlayback) await playQuestion();
@@ -278,9 +323,10 @@ app.addEventListener('click', event => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
   if (!target || target.disabled || event.detail > 1) return;
   const action = target.dataset.action;
-  if (active() && !['answer', 'next', 'replay', 'end', 'retry-save'].includes(action!)) return;
+  if (active() && !['answer', 'answer-keyboard', 'next', 'replay', 'pause', 'end', 'retry-save'].includes(action!)) return;
   switch (action) {
     case 'home': navigate('home'); break;
+    case 'keyboard-module': navigate('keyboard-setup'); break;
     case 'module':
       if (target.dataset.module === 'notation' || target.dataset.module === 'relative') exerciseModule = target.dataset.module;
       navigate('module'); break;
@@ -291,20 +337,27 @@ app.addEventListener('click', event => {
       updateModuleSettings({ lastMainMode: setupMode });
       navigate('setup'); break;
     case 'start': startMain(); break;
+    case 'start-keyboard': { const { direction, questionCount } = settings().modules.keyboard; void start({ module: 'keyboard', mode: 'practice', direction, count: questionCount }); break; }
     case 'answer': answer(target.dataset.answer as Solfege); break;
+    case 'answer-keyboard': answerKeyboard(Number(target.dataset.pitch) as PitchClass); break;
+    case 'pause': interrupt(); break;
     case 'next': next(); break;
     case 'replay': if (session?.replay()) void playQuestion(); break;
     case 'end': confirmEnd(); break;
     case 'preview': void preview(Number(target.dataset.degree) as Degree, target); break;
     case 'open-report': { const found = storage.data.sessions.find(s => s.id === target.dataset.id); if (found) openReport(found); break; }
-    case 'filter': historyFilter = target.dataset.filter as Mode | 'all'; render(false); app.querySelector<HTMLButtonElement>(`[data-filter="${historyFilter}"]`)?.focus(); break;
-    case 'filter-module': historyModule = target.dataset.module as ExerciseModule | 'all'; historyFilter = 'all'; render(false); app.querySelector<HTMLButtonElement>(`[data-action="filter-module"][data-module="${historyModule}"]`)?.focus(); break;
+    case 'filter': historyFilter = target.dataset.filter as Mode | 'all'; updateHistory(); break;
+    case 'filter-module': historyModule = target.dataset.module as ExerciseModule | 'all'; historyFilter = 'all'; historyDirection = 'all'; updateHistory(); break;
+    case 'filter-direction': historyDirection = target.dataset.direction as KeyboardDirection | 'all'; updateHistory(); break;
     case 'clear-history': showDialog('清空历史记录？', '将删除本应用保存的所有练习、考试与强化记录。声音和练习设置会保留。',
       [{ label: '取消', run: () => {} }, { label: '确认清空', run: () => { storage.clearHistory(); render(); } }], () => {}); break;
     case 'reinforce': chooseReinforcement(); break;
     case 'start-reinforcement': if (reinforcement) void start({ module: 'notation', mode: 'reinforcement', key: reinforcement.examKey, count: 21, muted: muted(settings()), source: reinforcement }); break;
     case 'source-report': sourceReport(); break;
-    case 'again': if (report && report.mode !== 'reinforcement') startMain(report.mode, report.key, report.plannedQuestions, report.module); break;
+    case 'again':
+      if (report?.module === 'keyboard') void start({ module: 'keyboard', mode: 'practice', direction: report.direction, count: report.plannedQuestions });
+      else if (report && report.mode !== 'reinforcement') startMain(report.mode, report.key, report.plannedQuestions, report.module);
+      break;
     case 'again-reinforcement': reinforcement = structuredClone(report!.reinforcementSource!); navigate('review'); break;
     case 'retest-source': { const source = report!.reinforcementSource!; startMain('exam', source.examKey, source.examPlannedQuestions, 'notation'); break; }
     case 'retry-save': storage.retry(); render(false); break;
@@ -320,7 +373,7 @@ app.addEventListener('input', event => {
 });
 function soundUpdated() {
   setPianoVolume();
-  if (active() && muted(settings())) session!.markMuted();
+  if (active() && session && muted(settings())) session.markMuted();
   const label = app.querySelector('#sound-label');
   if (label) label.textContent = volumeLabel(settings());
   const value = app.querySelector('#volume-value');
@@ -336,12 +389,13 @@ function soundUpdated() {
   if (muted(settings()) && session.phase === 'loading') {
     operation++;
     busy = false;
-    session.ready();
+    session.ready(true);
     render();
   } else if (!muted(settings()) && piano.status !== 'ready' && !['loading', 'paused', 'audioError'].includes(session.phase)) {
     session.suspend();
     void resume();
   }
+  syncPlaybackControls();
 }
 app.addEventListener('change', event => {
   const target = event.target as HTMLInputElement;
@@ -359,6 +413,16 @@ app.addEventListener('change', event => {
     if (count !== 7 && count !== 21 && count !== 35) return;
     updateModuleSettings({ [setupMode === 'practice' ? 'practiceQuestionCount' : 'examQuestionCount']: count });
     document.querySelector<HTMLElement>('#small-sample')!.hidden = setupMode !== 'exam' || count !== 7;
+  }
+  if (page === 'keyboard-setup') {
+    const keyboard = settings().modules.keyboard;
+    if (target.name === 'keyboard-direction' && (target.value === 'name-to-key' || target.value === 'key-to-name')) {
+      storage.updateSettings({ ...settings(), modules: { ...settings().modules, keyboard: { ...keyboard, direction: target.value } } });
+    }
+    const count = Number(target.value);
+    if (target.name === 'keyboard-count' && (count === 12 || count === 24 || count === 36)) {
+      storage.updateSettings({ ...settings(), modules: { ...settings().modules, keyboard: { ...keyboard, questionCount: count } } });
+    }
   }
   if (target.name === 'pair' && page === 'result') {
     if (target.checked) selectedPairs.add(target.value); else selectedPairs.delete(target.value);

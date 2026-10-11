@@ -89,13 +89,13 @@ it('两模块答后播放锁定下一题，暂停恢复不改首次答案、耗�
     expect(session.next()).toBe(true);
   }
 });
-it('旧 v2 逐题记录和强化快照归入简谱，先备份再保存 v3，两个模块设置分离', () => {
+it('旧 v2 逐题记录和强化快照归入简谱，先备份再保存 v4，两个模块设置分离', () => {
   const exam = notationReport(), source = sourceSnapshot(exam, confusionPairs(exam.answers!));
   const reinforcement = new Session({ module: 'notation', mode: 'reinforcement', key: 'F#', count: 21, muted: false, source }).finish();
   const memory = new MemoryStorage(), original = legacyV2([exam, reinforcement]);
   memory.setItem(STORAGE_KEY, original); memory.setItem(BACKUP_KEY, 'older-v1-backup');
   const store = new LocalStore(memory);
-  expect(store.data.schemaVersion).toBe(3);
+  expect(store.data.schemaVersion).toBe(4);
   expect(memory.getItem(BACKUP_V2_KEY)).toBe(original);
   expect(memory.getItem(BACKUP_KEY)).toBe('older-v1-backup');
   expect(store.data.sessions.find(s => s.id === exam.id)).toEqual(exam);

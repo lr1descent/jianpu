@@ -17,4 +17,6 @@ Tone.js 所托管 MP3 是该音源的转码版本；作者/许可依据 FreePats
 
 ## 软件、字体与图标
 
+历史列表动画使用 **AutoAnimate 0.10.0**，Copyright 2022 FormKit Inc.，MIT 许可证。项目：https://github.com/formkit/auto-animate；原始许可证副本随静态资源分发于 `public/licenses/auto-animate-MIT.txt`。该库随应用打包，本地运行不访问第三方 CDN。
+
 Tone.js、Vite、TypeScript、Vitest、Playwright 及其依赖遵循各软件包内许可证（依赖版本见锁文件）。Tone.js 使用 MIT 许可证。本项目不分发 Apple 字体，不请求外部字体；全部文本使用设备系统字体。没有外部图标库或装饰插画。

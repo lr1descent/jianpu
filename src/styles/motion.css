@@ -1,0 +1,36 @@
+:root {
+  --motion-press: 110ms;
+  --motion-feedback: 180ms;
+  --motion-ease: cubic-bezier(.2, .7, .2, 1);
+}
+.button, .mode-card, .answer, .note-card, .history-row, .segmented button,
+.segmented label span, .direction-choice {
+  transition: background-color var(--motion-feedback), border-color var(--motion-feedback),
+    box-shadow var(--motion-feedback), scale var(--motion-press) var(--motion-ease),
+    translate var(--motion-feedback) var(--motion-ease);
+}
+.button:active:not(:disabled), .answer:active:not(:disabled), .note-card:active,
+.segmented button:active, .segmented label:active span { scale: .97; }
+.mode-card:active, .history-row:active, .direction-choice:active { scale: .99; }
+@media (hover: hover) {
+  .mode-card:hover { translate: 0 -2px; box-shadow: 0 5px 14px rgb(0 0 0 / 7%); }
+  .note-card:hover { translate: 0 -1px; }
+}
+.mode-card:active, .note-card:active { translate: 0 0; }
+.piano-key {
+  transform-origin: center top;
+  transition: scale var(--motion-press) var(--motion-ease), box-shadow var(--motion-feedback),
+    background-color var(--motion-feedback);
+}
+/* Independent scale keeps black keys' positioning transform intact. */
+button.piano-key:active:not(:disabled) { scale: 1 .98; }
+.segmented button[aria-pressed="true"], .segmented input:checked + span {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+/* The animated label is visual only; the native radio remains the hit target. */
+.segmented label span { pointer-events: none; }
+.history-row[inert] { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .button, .mode-card, .answer, .note-card, .history-row, .segmented button,
+  .segmented label span, .direction-choice, .piano-key { scale: none !important; translate: none !important; }
+}

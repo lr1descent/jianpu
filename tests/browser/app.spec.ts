@@ -48,7 +48,7 @@ test('练习：实际音频采样、首次错选、重听、稳定反馈位置�
   await expect(page.locator('.score-section')).toContainText('已答 1 / 7 · 正确 0 · 错误 1');
   await expect(page.locator('.report-facts')).toContainText('1 次');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('jianpu-solfege-trainer')!));
-  expect(stored.schemaVersion).toBe(3); expect(stored.sessions).toHaveLength(1);
+  expect(stored.schemaVersion).toBe(4); expect(stored.sessions).toHaveLength(1);
   expect(stored.sessions[0].answers[0].selected).toBe(names[Number(oldQuestion) % 7]);
 });
 test('考试：中性提交、35 题样本报告、主动选择强化和来源隔离', async ({ page }) => {

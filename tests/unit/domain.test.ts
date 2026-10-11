@@ -140,7 +140,7 @@ describe('有方向的混淆及自选强化', () => {
     expect(result.id).not.toBe(exam.id); expect(exam).toEqual(before);
   });
 });
-describe('schema v3、迁移与本地数据安全', () => {
+describe('schema v4、迁移与本地数据安全', () => {
   it('保存真实错选，读取还原报告，ID 去重，上限按结束时间保留 100', () => {
     const memory = new MemoryStorage(); const store = new LocalStore(memory); const report = sampleReport();
     store.save(report); store.save(report); expect(store.data.sessions).toHaveLength(1);

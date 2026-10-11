@@ -1,16 +1,17 @@
 import { DEGREES, KEYS, keyInfo, solfege } from './music';
 import { accuracy, summarize } from './statistics';
 import { confusionMatrix, confusionPairs } from './confusion';
+import { keyboardDirectionName } from './keyboard';
 import type { Session } from './session';
-import type { ConfusionPair, Degree, ExerciseModule, KeyId, Mode, ModuleSettings, ReinforcementSource, SessionRecord, Settings } from './types';
+import type { ConfusionPair, Degree, ExerciseModule, KeyboardDirection, KeyId, Mode, ModuleSettings, PracticeRecord, ReinforcementSource, SessionRecord, Settings, SolfegeModule } from './types';
 
 type ViewSettings = ModuleSettings & Pick<Settings, 'volume' | 'muted'>;
 
 export const escape = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 export const modeName = (mode: Mode) => ({ practice: '练习', exam: '考试', reinforcement: '强化练习' }[mode]);
-export const moduleName = (module: ExerciseModule) => ({ notation: '简谱识读', relative: '相对音程' }[module]);
+export const moduleName = (module: ExerciseModule) => ({ notation: '简谱识读', relative: '相对音程', keyboard: '钢琴键盘音位识别' }[module]);
 export const dateLabel = (value: string) => new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short', hour12: false }).format(new Date(value));
-const button = (action: string, label: string, style = 'secondary', attrs = '') => `<button type="button" class="button ${style}" data-action="${action}" ${attrs}>${label}</button>`;
+export const button = (action: string, label: string, style = 'secondary', attrs = '') => `<button type="button" class="button ${style}" data-action="${action}" ${attrs}>${label}</button>`;
 export const keySelect = (value: KeyId) => `<div class="field"><label for="key">调性</label><select id="key" name="key">${KEYS.map(k => `<option value="${k.id}" ${k.id === value ? 'selected' : ''}>${k.label} 大调（1=${k.label}）</option>`).join('')}</select></div>`;
 export const muted = (settings: Pick<Settings, 'volume' | 'muted'>) => settings.muted || settings.volume === 0;
 export const volumeLabel = (settings: Pick<Settings, 'volume' | 'muted'>) => settings.muted ? '已静音' : settings.volume === 0 ? '音量 0% · 已静音' : `音量 ${Math.round(settings.volume * 100)}%`;
@@ -22,28 +23,29 @@ export function soundControl(settings: Pick<Settings, 'volume' | 'muted'>) {
       <label class="check-row"><input id="mute" type="checkbox" ${settings.muted ? 'checked' : ''} />静音</label>
     </div></details>`;
 }
-export function header(settings: Settings, session?: Session) {
+export function header(settings: Settings, session?: { config: { module: ExerciseModule; mode: Mode } }) {
   return `<header class="site-header"><div class="header-inner">
-    ${session ? `<span class="brand">${moduleName(session.config.module)} <span class="brand-mode">· ${modeName(session.config.mode)}</span></span>` : button('home', '简谱唱名', 'brand plain')}
+    ${session ? `<span class="brand">${session.config.module === 'keyboard' ? '键盘音位识别' : moduleName(session.config.module)} <span class="brand-mode">· ${modeName(session.config.mode)}</span></span>` : button('home', '简谱唱名', 'brand plain')}
     ${session ? soundControl(settings) : `<nav aria-label="主导航">${button('learn', '认识音符', 'plain')}${button('history', '历史记录', 'plain')}</nav>`}
     </div></header>`;
 }
 export function homeView() {
-  return `<main class="home page" id="main"><div class="home-intro"><h1 tabindex="-1">从一个音开始。</h1><p>认识唱名，也听见音与音的距离。</p></div>
+  return `<main class="home page" id="main"><div class="home-intro"><h1 tabindex="-1">从一个音开始。</h1><p>认识唱名，听见音程，也找到琴键的位置。</p></div>
     <div class="mode-grid">
       <button class="mode-card" data-action="module" data-module="notation"><span class="mode-title">简谱识读</span><span class="secondary-text">看数字，听钢琴，选唱名。</span><span class="card-link">进入模块 <span aria-hidden="true">→</span></span></button>
       <button class="mode-card" data-action="module" data-module="relative"><span class="mode-title">相对音程</span><span class="secondary-text">先听 do，再辨认目标音的唱名。</span><span class="card-link">进入模块 <span aria-hidden="true">→</span></span></button>
-    </div><p class="home-note">每个模块都提供练习与考试，按自己的节奏来。</p>
+      <button class="mode-card keyboard-entry" data-action="keyboard-module"><span class="mode-title">钢琴键盘音位识别</span><span class="secondary-text" lang="en">Keyboard Note Identification</span><span>音名 → 琴键 · 琴键 → 音名</span><span class="card-link">进入练习 <span aria-hidden="true">→</span></span></button>
+    </div><p class="home-note">选择想练习的能力，按自己的节奏来。</p>
     <footer class="local-note">记录保存在本机 · 声音使用本地钢琴采样</footer></main>`;
 }
-export function moduleView(module: ExerciseModule) {
+export function moduleView(module: SolfegeModule) {
   return `<main class="page home" id="main">${button('home', '← 返回首页', 'plain back')}<div class="home-intro"><h1 tabindex="-1">${moduleName(module)}</h1><p>${module === 'relative' ? '每题先听参考 do，再听目标音。不显示音符数字。' : '把数字与唱名联系起来，钢琴声帮助记忆。'}</p></div>
     <div class="mode-grid">
       <button class="mode-card" data-action="setup-practice"><span class="mode-title">练习模式</span><span class="secondary-text">每题即时反馈，慢慢建立联系。</span><span class="card-link">进入练习 <span aria-hidden="true">→</span></span></button>
       <button class="mode-card" data-action="setup-exam"><span class="mode-title">考试模式</span><span class="secondary-text">交卷后查看结果，了解本轮表现。</span><span class="card-link">进入考试 <span aria-hidden="true">→</span></span></button>
     </div></main>`;
 }
-export function setupView(module: ExerciseModule, mode: 'practice' | 'exam', settings: ViewSettings) {
+export function setupView(module: SolfegeModule, mode: 'practice' | 'exam', settings: ViewSettings) {
   const count = mode === 'practice' ? settings.practiceQuestionCount : settings.examQuestionCount;
   return `<main class="page narrow" id="main">${button('module', `← ${moduleName(module)}`, 'plain back')}
     <div class="page-heading"><h1 tabindex="-1">${modeName(mode)}模式</h1><p class="secondary-text">${moduleName(module)} · ${mode === 'practice' ? '选择唱名后，立即查看正确对应。' : '专注作答。对错与成绩将在交卷后一起揭晓。'}</p>${module === 'relative' ? '<p class="field-hint">每题先播放参考 do，再播放 do–si 中的一个目标音。听完后选择唱名；本模块需要开启声音。</p>' : ''}</div>
@@ -82,7 +84,7 @@ export function answerClass(session: Session, option: string) {
   if (option === session.question.correctAnswer) return 'correct';
   return option === answer.selected ? 'incorrect' : '';
 }
-export function nextLabel(session: Session) {
+export function nextLabel(session: { index: number; questions: readonly unknown[]; config: { mode: Mode } }) {
   return session.index < session.questions.length - 1 ? '下一题' : ({ practice: '查看练习小结', exam: '交卷并查看报告', reinforcement: '查看强化小结' }[session.config.mode]);
 }
 export function playbackStatus(session: Session) {
@@ -105,7 +107,7 @@ export function quizView(session: Session) {
     <div class="quiz-footer"><span id="running-summary" class="secondary-text">${runningSummary(session)}</span>${button('end', session.config.mode === 'exam' ? '提前交卷' : '结束本轮', 'plain')}</div>
     <p class="quiz-hint">${loading ? '采样从本地加载。' : '按 Tab 切换选项，按空格或 Enter 选择。'}<span id="muted-note"></span></p></main>`;
 }
-export function runningSummary(session: Session) {
+export function runningSummary(session: { answers: readonly { correct: boolean }[]; config: { mode: Mode } }) {
   return `已答 ${session.answers.length} 题${session.config.mode === 'exam' ? '' : ` · 正确 ${session.answers.filter(a => a.correct).length} 题`}`;
 }
 function directionText(pair: ConfusionPair, report: SessionRecord) {
@@ -161,11 +163,17 @@ function reinforcementSummary(report: SessionRecord, source: ReinforcementSource
     <p class="field-hint">来源考试：${dateLabel(source.examEndedAt)} · ${keyInfo(source.examKey).label} 大调 · 已答 ${source.examAnswered} / ${source.examPlannedQuestions} · 正确 ${source.examCorrect}</p>${sourceExists ? '' : '<p class="notice">来源报告已不在本地。强化小结和来源摘要仍然保留。</p>'}
     <h3>本轮错选方向</h3>${pairs.length ? pairs.map(p => `<p class="secondary-text">${directionText(p, report)}</p>`).join('') : '<p class="secondary-text">本次未发现错选项。</p>'}</section>`;
 }
-export function historyView(sessions: SessionRecord[], filter: Mode | 'all', module: ExerciseModule | 'all') {
-  const filtered = sessions.filter(s => (filter === 'all' || s.mode === filter) && (module === 'all' || s.module === module));
+export function historyResultsView(sessions: PracticeRecord[], filter: Mode | 'all', module: ExerciseModule | 'all', direction: KeyboardDirection | 'all' = 'all') {
+  const filtered = sessions.filter(s => (filter === 'all' || s.mode === filter) && (module === 'all' || s.module === module)
+    && (module !== 'keyboard' || direction === 'all' || (s.module === 'keyboard' && s.direction === direction)));
+  return filtered.length ? filtered.map(s => `<button class="history-row" data-list-key="record:${escape(s.id)}" data-action="open-report" data-id="${escape(s.id)}"><span><strong>${moduleName(s.module)} · ${s.module === 'keyboard' ? keyboardDirectionName(s.direction) : `${modeName(s.mode)} · ${keyInfo(s.key).label} 大调`}</strong><span class="secondary-text">${dateLabel(s.endedAt)} · ${s.endedEarly ? '部分完成' : '已完成'}${s.legacySummaryOnly ? ' · 旧版摘要' : ''}</span></span><span class="history-count">正确 ${s.summary.correct} / 已答 ${s.summary.answered}<span aria-hidden="true"> →</span></span></button>`).join('')
+    : `<div class="empty-state" data-list-key="empty"><p>${sessions.length ? '此筛选条件下还没有记录。' : '还没有记录。完成一轮后会保存在这里。'}</p>${button('home', '返回首页')}</div>`;
+}
+export function historyView(sessions: PracticeRecord[], filter: Mode | 'all', module: ExerciseModule | 'all', direction: KeyboardDirection | 'all' = 'all') {
   return `<main class="page reading" id="main">${button('home', '← 返回首页', 'plain back')}<div class="section-heading page-heading"><h1 tabindex="-1">历史记录</h1>${sessions.length ? button('clear-history', '清空历史', 'plain') : ''}</div>
-    <div class="segmented history-filter" role="group" aria-label="筛选模块">${(['all', 'notation', 'relative'] as const).map(item => `<button data-action="filter-module" data-module="${item}" aria-pressed="${module === item}">${item === 'all' ? '全部模块' : moduleName(item)}</button>`).join('')}</div>
-    <div class="segmented history-filter" role="group" aria-label="筛选模式">${(['all', 'practice', 'exam', ...(module === 'relative' ? [] : ['reinforcement'])] as (Mode | 'all')[]).map(mode => `<button data-action="filter" data-filter="${mode}" aria-pressed="${filter === mode}">${mode === 'all' ? '全部' : modeName(mode)}</button>`).join('')}</div>
-    ${filtered.length ? `<div class="history-list">${filtered.map(s => `<button class="history-row" data-action="open-report" data-id="${escape(s.id)}"><span><strong>${moduleName(s.module)} · ${modeName(s.mode)} · ${keyInfo(s.key).label} 大调</strong><span class="secondary-text">${dateLabel(s.endedAt)} · ${s.endedEarly ? '部分完成' : '已完成'}${s.legacySummaryOnly ? ' · 旧版摘要' : ''}</span></span><span class="history-count">正确 ${s.summary.correct} / 已答 ${s.summary.answered}<span aria-hidden="true"> →</span></span></button>`).join('')}</div>` : `<div class="empty-state"><p>${sessions.length ? '此筛选条件下还没有记录。' : '还没有记录。完成一轮后会保存在这里。'}</p>${button('home', '返回首页')}</div>`}
+    <div class="segmented history-filter module-filter" role="group" aria-label="筛选模块">${(['all', 'notation', 'relative', 'keyboard'] as const).map(item => `<button data-action="filter-module" data-module="${item}" aria-pressed="${module === item}">${item === 'all' ? '全部模块' : moduleName(item)}</button>`).join('')}</div>
+    <div class="segmented history-filter" id="history-direction-filter" role="group" aria-label="筛选键盘方向" ${module === 'keyboard' ? '' : 'hidden'}>${(['all', 'name-to-key', 'key-to-name'] as const).map(item => `<button data-action="filter-direction" data-direction="${item}" aria-pressed="${direction === item}">${item === 'all' ? '两个方向' : keyboardDirectionName(item)}</button>`).join('')}</div>
+    <div class="segmented history-filter" id="history-mode-filter" role="group" aria-label="筛选模式" ${module === 'keyboard' ? 'hidden' : ''}>${(['all', 'practice', 'exam', 'reinforcement'] as const).map(mode => `<button data-action="filter" data-filter="${mode}" aria-pressed="${filter === mode}" ${module === 'relative' && mode === 'reinforcement' ? 'hidden' : ''}>${mode === 'all' ? '全部' : modeName(mode)}</button>`).join('')}</div>
+    <div class="history-list" id="history-results">${historyResultsView(sessions, filter, module, direction)}</div>
     <p class="field-hint">最近 100 轮保存在本机，不在设备间同步。清理本地存储数据可能影响保留。</p></main>`;
 }
